@@ -1,0 +1,424 @@
+### SCOPUS API ###
+##################
+
+library(data.table)
+SCOPUS.test.VPresults <- fread("VPtest.tab")
+
+### TO-DO: Insert own SCOPUS API key after apiKey=
+
+### 1. Function to search and download JSON file of based on PMID
+
+DownloadSCOPUSData <- function (PMID) {
+  library(curl)
+  library(jsonlite)
+  PMIDQuery <- paste0("PMID(", PMID)
+  SCOPUS.test.url <- paste0("https://api.elsevier.com/content/search/scopus?query=", PMIDQuery, ")&apiKey=&view=COMPLETE")
+  tmp <- tempfile("tmp", tmpdir = "./SCOPUS", fileext = ".txt")
+  curl_download(SCOPUS.test.url, tmp)
+}
+
+
+### TO-DO: replace the file name with the right YEAR and SPECIES (use search and replace all)
+
+### Reading the PMCID CSV file and turn to tibble
+library(readr)
+EPMC.test.full.PMID.raw <- read_csv("./EPMC_Pig_2008_PMID.csv")
+
+### turn to data.table 
+library(data.table)
+EPMC.test.PMID.raw <- EPMC.test.Combine.dt.wide.raw.PMID.unlist.combine.dt
+EPMC.test.full.PMID.import.dt <- data.table(EPMC.test.PMID.raw)
+
+library(tidyr)
+library(data.table)
+EPMC.test.full.PMID.import.dt.raw <- EPMC.test.full.PMID.import.dt[, accession_number:=NULL]
+EPMC.test.full.PMID.import.dt.long.dt <- data.table(gather(EPMC.test.full.PMID.import.dt.raw, EPMC_PMID_number, PMID))
+
+# getting all PMIDs by removing NA
+EPMC.test.full.PMID.import.dt.long.na.omit <- as.data.table(na.omit(EPMC.test.full.PMID.import.dt.long.dt, cols="PMID"))
+
+# getting uinqiue PMIDs
+EPMC.test.full.PMID.import.dt.long.na.omit.unique <- unique(EPMC.test.full.PMID.import.dt.long.na.omit, by="PMID")
+
+# Convert the column class to integer
+EPMC.test.full.PMID.import.dt.long.na.omit.unique[, PMID:=as.integer(PMID)]
+
+
+
+library(plyr)
+library(curl)
+SCOPUS.test.raw <- do.call (cbind, adply(EPMC.test.full.PMID.import.dt.long.na.omit.unique$PMID, 1, function(PMID){
+  SCOPUS.test.raw <- ldply(PMID, DownloadSCOPUSData)
+}, .progress = "text")) 
+
+# List the files in the folder, created by DownloadSCOPUSData
+SCOPUS.test.raw.filelist <- list.files("./SCOPUS", pattern = "tmp")
+
+
+### 2. Parse each JSON file downloaded, based on the file list 
+
+library(data.table)
+library(plyr)
+library(jsonlite)
+SCOPUS.test.Combine.df <- ldply(SCOPUS.test.raw.filelist, function (x){
+  SCOPUS.test.raw.filename <- paste0("./SCOPUS/", x)
+  SCOPUS.test.raw.parsed <- fromJSON(SCOPUS.test.raw.filename)
+  SCOPUS.test.raw.parsed.raw <- SCOPUS.test.raw.parsed$`search-results`$entry
+  # obtain the PMID from the query
+  SCOPUS.test.raw.parsed.raw.PMID <- SCOPUS.test.raw.parsed$`search-results`$entry$`pubmed-id`
+  # convert the parsed JSON data to data.table
+  SCOPUS.test.raw.parsed.dt <- data.table(as.matrix(unlist(SCOPUS.test.raw.parsed.raw, recursive = FALSE), rowname.force = TRUE), keep.rownames = TRUE)
+  #attach PMID (based on query) to the parsed JSON data
+  SCOPUS.test.Combine.df <- data.table(PMID = SCOPUS.test.raw.parsed.raw.PMID, SCOPUS_data = SCOPUS.test.raw.parsed.dt) 
+})
+
+# Convert the dataframe of JSON values to data.table
+SCOPUS.test.Combine.dt <- as.data.table(SCOPUS.test.Combine.df)
+
+### Spread the parsed JSON data to wide format 
+library(tidyr)
+SCOPUS.test.Combine.dt.wide.raw <- spread(SCOPUS.test.Combine.dt, "SCOPUS_data.rn", "SCOPUS_data.V1", fill = NA) 
+library(data.table)
+setkey(SCOPUS.test.Combine.dt.wide.raw, PMID)
+
+### Unnest the affiliation list 
+SCOPUS.test.Combine.dt.wide.affiliation.raw.all <- data.table(PMID = SCOPUS.test.Combine.dt.wide.raw$PMID, SCOPUS.Affiliation.list = SCOPUS.test.Combine.dt.wide.raw$affiliation)
+## Removing entries that affiliation list is NULL
+SCOPUS.test.Combine.dt.wide.affiliation.raw <- SCOPUS.test.Combine.dt.wide.affiliation.raw.all[SCOPUS.Affiliation.list != "NULL"]
+SCOPUS.test.Combine.dt.wide.affiliation.unnest <- unnest(SCOPUS.test.Combine.dt.wide.affiliation.raw, .id = "SCOPUS_PMID")
+
+SCOPUS.test.Combine.dt.wide.affiliation.raw.NULL <- SCOPUS.test.Combine.dt.wide.affiliation.raw.all[SCOPUS.Affiliation.list == "NULL"]
+View(SCOPUS.test.Combine.dt.wide.affiliation.raw.NULL)
+colnames(SCOPUS.test.Combine.dt.wide.affiliation.unnest)
+
+## if there is no null, can proceed to saving as full
+# SCOPUS.test.Combine.dt.wide.affiliation.unnest.full <- SCOPUS.test.Combine.dt.wide.affiliation.unnest
+
+## if there is NULL, replacing NULL in SCOPUS.Affiliation with NA in each column of unnested data.table
+# list the column names of the unnested columns, apart from PMID 
+SCOPUS.test.Combine.dt.wide.affiliation.unnest.cols <- colnames(SCOPUS.test.Combine.dt.wide.affiliation.unnest)
+SCOPUS.test.Combine.dt.wide.affiliation.unnest.cols.Length <- length(SCOPUS.test.Combine.dt.wide.affiliation.unnest.cols)
+SCOPUS.test.Combine.dt.wide.affiliation.unnest.cols.select <- SCOPUS.test.Combine.dt.wide.affiliation.unnest.cols[2:SCOPUS.test.Combine.dt.wide.affiliation.unnest.cols.Length]
+# delete SCOPUS.Affiliation.list column Put NA in all but PMID columns as NA
+SCOPUS.test.Combine.dt.wide.affiliation.raw.NULL[, SCOPUS.Affiliation.list := NULL][, (SCOPUS.test.Combine.dt.wide.affiliation.unnest.cols.select) := NA]
+
+### Combine (bind_rows) of the entries with unnested affilaitions and NULL affiliation
+library(dtplyr)
+SCOPUS.test.Combine.dt.wide.affiliation.unnest <- tbl_dt(SCOPUS.test.Combine.dt.wide.affiliation.unnest)
+SCOPUS.test.Combine.dt.wide.affiliation.raw.NULL <- tbl_dt(SCOPUS.test.Combine.dt.wide.affiliation.raw.NULL)
+library(dplyr)
+SCOPUS.test.Combine.dt.wide.affiliation.unnest.full <- bind_rows(SCOPUS.test.Combine.dt.wide.affiliation.unnest, SCOPUS.test.Combine.dt.wide.affiliation.raw.NULL)
+
+
+### if there is name variant in affiliation ###
+# identify entries that name-variant is not null
+setnames(SCOPUS.test.Combine.dt.wide.affiliation.unnest.full, "name-variant", "name_variant")
+
+### dealing with name variant with specific PMID
+SCOPUS.test.Combine.dt.wide.affiliation.unnest.full.nameVariant <- SCOPUS.test.Combine.dt.wide.affiliation.unnest.full[name_variant != "NULL",]
+View(SCOPUS.test.Combine.dt.wide.affiliation.unnest.full.nameVariant)
+View(SCOPUS.test.Combine.dt.wide.affiliation.unnest.full)
+
+SCOPUS.test.Combine.dt.wide.affiliation.unnest.full.nameVariant$name_variant
+
+#change affilname by PMID
+#SCOPUS.test.Combine.dt.wide.affiliation.unnest.full <- SCOPUS.test.Combine.dt.wide.affiliation.unnest.full[PMID == "6327055", affilname := "Takeda Chemical Industries"]
+# change affilname by original affilname 
+SCOPUS.test.Combine.dt.wide.affiliation.unnest.full <- SCOPUS.test.Combine.dt.wide.affiliation.unnest.full[
+    affilname == "Bonner Forum Biomedizin and LIMES", affilname := "Bonner Forum Biomedizin and LIMES, Institut fur Physiologische Chemie and Abteilung fÃ¼r Zellbiochemie"][
+    affilname == "Ltd.", affilname := "Mitsui Knowledge Industry Co."][
+    affilname == "and Blood Inst.", affilname := "Natl. Heart Lung and Blood Inst."][
+    affilname == "John Radcliffe H.", affilname := "John Radcliffe H., Inst. Molec. Med."][
+    affilname == "Rochester School of Medicine Rochester", affilname := "Rochester School of Medicine Rochester, Department of Neurology"][
+    affilname == "Southern California School of Pharmacy Los Angeles", affilname := "Southern California School of Pharmacy Los Angeles, Department of Pharmaceutical Sciences"
+  ]
+
+## Change affilname by row number
+SCOPUS.test.Combine.dt.wide.affiliation.unnest.full <- SCOPUS.test.Combine.dt.wide.affiliation.unnest.full[
+    1906, affilname := "Genetech"][
+    1991, affilname := "Hayashibara Biochem. Labs."]
+
+
+# delete name variant column
+SCOPUS.test.Combine.dt.wide.affiliation.unnest.full[, name_variant := NULL]
+
+### Alternative method
+SCOPUS.test.Combine.dt.wide.affiliation.variant <- SCOPUS.test.Combine.dt.wide.affiliation.unnest.full[name_variant != "NULL"]
+SCOPUS.test.Combine.dt.wide.affiliation.variant.dt.raw <- as.data.table(SCOPUS.test.Combine.dt.wide.affiliation.variant$name_variant)
+setnames(SCOPUS.test.Combine.dt.wide.affiliation.variant.dt.raw, c(colnames(SCOPUS.test.Combine.dt.wide.affiliation.variant.dt.raw)), c("fa", "name_variant"))
+SCOPUS.test.Combine.dt.wide.affiliation.variant.dt.raw.variant <- SCOPUS.test.Combine.dt.wide.affiliation.variant.dt.raw$name_variant
+SCOPUS.test.Combine.dt.wide.affiliation.variant.dt <- SCOPUS.test.Combine.dt.wide.affiliation.variant[, name_variant := (SCOPUS.test.Combine.dt.wide.affiliation.variant.dt.raw.variant)]
+
+SCOPUS.test.Combine.dt.wide.affiliation.variant.NULL <- SCOPUS.test.Combine.dt.wide.affiliation.unnest.full[name_variant == "NULL"]
+SCOPUS.test.Combine.dt.wide.affiliation.variant.NULL.dt <- SCOPUS.test.Combine.dt.wide.affiliation.variant.NULL[, name_variant := NULL][, name_variant := NA]
+
+library(dtplyr)
+SCOPUS.test.Combine.dt.wide.affiliation.variant.NULL.dt <- tbl_dt(SCOPUS.test.Combine.dt.wide.affiliation.variant.NULL.dt)
+SCOPUS.test.Combine.dt.wide.affiliation.variant.dt <- tbl_dt(SCOPUS.test.Combine.dt.wide.affiliation.variant.dt)
+SCOPUS.test.Combine.dt.wide.affiliation.unnest.full <- full_join(SCOPUS.test.Combine.dt.wide.affiliation.variant.NULL.dt, SCOPUS.test.Combine.dt.wide.affiliation.variant.dt)
+
+
+
+### Write TSV of SCOPUS Affiliations FULL
+library(readr)
+write_tsv(SCOPUS.test.Combine.dt.wide.affiliation.unnest.full, "SCOPUSAffiliationNames.tsv")
+
+###Getting Distinct entries of combination of afid and affilname 
+library(dplyr)
+# SCOPUS.test.Combine.dt.wide.affiliation.unnest.full.distinctAfid<- distinct(SCOPUS.test.Combine.dt.wide.affiliation.unnest.full, afid, affilname)
+SCOPUS.test.Combine.dt.wide.affiliation.unnest.full.distinctAfid <- distinct(SCOPUS.test.Combine.dt.wide.affiliation.unnest.full, afid, affilname, .keep_all = TRUE)
+#SCOPUS.test.Combine.dt.wide.affiliation.unnest.full.distinctPMID <- distinct(SCOPUS.test.Combine.dt.wide.affiliation.unnest.full, PMID, .keep_all = TRUE)
+
+write_tsv(SCOPUS.test.Combine.dt.wide.affiliation.unnest.full.distinctAfid, "SCOPUSAffiliationNames_Distinct.tsv")
+View(SCOPUS.test.Combine.dt.wide.affiliation.unnest.full.distinctAfid)
+
+
+### unnest the author list ###
+library(data.table)
+library(tidyr)
+SCOPUS.test.Combine.dt.wide.author.raw.all <- data.table(PMID = SCOPUS.test.Combine.dt.wide.raw$PMID, SCOPUS.author.list = SCOPUS.test.Combine.dt.wide.raw$author)
+
+## Removing entries that author list is NULL
+SCOPUS.test.Combine.dt.wide.author.raw <- SCOPUS.test.Combine.dt.wide.author.raw.all[SCOPUS.author.list != "NULL"]
+SCOPUS.test.Combine.dt.wide.author.unnest <- unnest(SCOPUS.test.Combine.dt.wide.author.raw, .id = "SCOPUS_PMID")
+
+SCOPUS.test.Combine.dt.wide.author.raw.NULL <- SCOPUS.test.Combine.dt.wide.author.raw.all[SCOPUS.author.list == "NULL"]
+SCOPUS.test.Combine.dt.wide.author.raw.NULL
+
+## if there is no null, can proceed to saving as full
+# SCOPUS.test.Combine.dt.wide.author.unnest.full <- SCOPUS.test.Combine.dt.wide.author.unnest
+
+## if there is NULL, replacing NULL in SCOPUS.author with NA in each column of unnested data.table
+# list the column names of the unnested columns, apart from PMID 
+SCOPUS.test.Combine.dt.wide.author.unnest.cols <- colnames(SCOPUS.test.Combine.dt.wide.author.unnest)
+SCOPUS.test.Combine.dt.wide.author.unnest.cols.Length <- length(SCOPUS.test.Combine.dt.wide.author.unnest.cols)
+SCOPUS.test.Combine.dt.wide.author.unnest.cols.select <- SCOPUS.test.Combine.dt.wide.author.unnest.cols[2:SCOPUS.test.Combine.dt.wide.author.unnest.cols.Length]
+# delete SCOPUS.author.list column Put NA in all but PMID columns as NA
+SCOPUS.test.Combine.dt.wide.author.raw.NULL[, SCOPUS.author.list := NULL][, (SCOPUS.test.Combine.dt.wide.author.unnest.cols.select) := NA]
+
+### Combine (bind_rows) of the entries with unnested affilaitions and NULL author
+library(dtplyr)
+SCOPUS.test.Combine.dt.wide.author.unnest <- tbl_dt(SCOPUS.test.Combine.dt.wide.author.unnest)
+SCOPUS.test.Combine.dt.wide.author.raw.NULL <- tbl_dt(SCOPUS.test.Combine.dt.wide.author.raw.NULL)
+library(dplyr)
+SCOPUS.test.Combine.dt.wide.author.unnest.full <- bind_rows(SCOPUS.test.Combine.dt.wide.author.unnest, SCOPUS.test.Combine.dt.wide.author.raw.NULL)
+
+
+
+# separating entries that afid list for author is NULL
+SCOPUS.test.Combine.dt.wide.author.unnest.afid.raw <- SCOPUS.test.Combine.dt.wide.author.unnest.full[afid != "NULL"]
+SCOPUS.test.Combine.dt.wide.author.unnest.raw.NULL <- SCOPUS.test.Combine.dt.wide.author.unnest.full[afid == "NULL"]
+SCOPUS.test.Combine.dt.wide.author.unnest.distinct <- distinct(SCOPUS.test.Combine.dt.wide.author.unnest.afid.raw, PMID, SCOPUS_PMID, `@seq`, authid, .keep_all = TRUE)
+
+View(SCOPUS.test.Combine.dt.wide.author.unnest.raw.NULL)
+
+# if there is NULL, replacing NULL by unlisting NULL lists, and then add NA
+SCOPUS.test.Combine.dt.wide.author.unnest.raw.NULL[, afid := NULL][, afid := NA]
+
+# unnesting the afid column of author lists
+SCOPUS.test.Combine.dt.wide.author.unnest.afid <- unnest(SCOPUS.test.Combine.dt.wide.author.unnest.distinct, afid, .drop = FALSE, .sep = "_" )
+# setting the name of the afid column as "afid"
+setnames(SCOPUS.test.Combine.dt.wide.author.unnest.afid, 12, "afid")
+SCOPUS.test.Combine.dt.wide.author.unnest.afid [, `afid_@_fa` := NULL]
+
+library(dtplyr)
+SCOPUS.test.Combine.dt.wide.author.unnest.afid <- tbl_dt(SCOPUS.test.Combine.dt.wide.author.unnest.afid)
+SCOPUS.test.Combine.dt.wide.author.unnest.raw.NULL <- tbl_dt(SCOPUS.test.Combine.dt.wide.author.unnest.raw.NULL)
+library(dplyr)
+SCOPUS.test.Combine.dt.wide.author.unnest.afid.full <- bind_rows(SCOPUS.test.Combine.dt.wide.author.unnest.afid, SCOPUS.test.Combine.dt.wide.author.unnest.raw.NULL)
+
+library(readr)
+write_tsv(SCOPUS.test.Combine.dt.wide.author.unnest.afid.full, "SCOPUSAuthorNames.tsv")
+
+###Getting Distinct entries of combination of author id, author name and afid 
+SCOPUS.test.Combine.dt.wide.affiliation.unnest.full.distinctAuthor <- distinct(SCOPUS.test.Combine.dt.wide.author.unnest.afid.full, authid, authname, afid, .keep_all = TRUE)
+
+### if exceeds 5000 unique authors 
+# SCOPUS.test.Combine.dt.wide.affiliation.unnest.full.distinctAuthor <- distinct(SCOPUS.test.Combine.dt.wide.author.unnest.afid.full, authid, authname, .keep_all = TRUE)
+# SCOPUS.test.Combine.dt.wide.affiliation.unnest.full.distinctAuthor <- distinct(SCOPUS.test.Combine.dt.wide.author.unnest.afid.full, authname, .keep_all = TRUE)
+# #SCOPUS.test.Combine.dt.wide.affiliation.unnest.full.distinctPMID <- distinct(SCOPUS.test.Combine.dt.wide.affiliation.unnest.full, PMID, .keep_all = TRUE)
+
+write_tsv(SCOPUS.test.Combine.dt.wide.affiliation.unnest.full.distinctAuthor, "SCOPUSAuthorNames_Distinct.tsv")
+View(SCOPUS.test.Combine.dt.wide.affiliation.unnest.full.distinctAuthor)
+
+
+### Selecting columns of afid, affilname, affiliation-city, affiliation-country, (and name_variant)
+SCOPUS.test.Combine.dt.wide.affiliation.afidList <- SCOPUS.test.Combine.dt.wide.affiliation.unnest.full.distinctAfid[, .(afid, affilname, `affiliation-city`, `affiliation-country`)]
+# If there is name-variant
+# SCOPUS.test.Combine.dt.wide.affiliation.afidList <- SCOPUS.test.Combine.dt.wide.affiliation.unnest.full.distinctAfid[, .(afid, affilname, `affiliation-city`, `affiliation-country`, name_variant)]
+
+# Omit affilname with no/NA afid
+SCOPUS.test.Combine.dt.wide.affiliation.afidList.naOmit <- na.omit(SCOPUS.test.Combine.dt.wide.affiliation.afidList, cols = "afid")
+
+# Join author names with affiliation names based on afid 
+SCOPUS.test.Combine.dt.wide.author.unnest.afid.joined <- SCOPUS.test.Combine.dt.wide.affiliation.unnest.full.distinctAuthor[SCOPUS.test.Combine.dt.wide.affiliation.afidList.naOmit, on = "afid"]
+
+library(readr)
+write_tsv(SCOPUS.test.Combine.dt.wide.author.unnest.afid.joined, "SCOPUSAuthorNames_Distinct_JoinedAfid.tsv")
+
+
+# get affilnames that afid is NA
+SCOPUS.test.Combine.dt.wide.affiliation.afidList.na <- na.omit(SCOPUS.test.Combine.dt.wide.affiliation.unnest.full.distinctAfid, cols = "afid", invert = TRUE)
+View(SCOPUS.test.Combine.dt.wide.affiliation.afidList.na)
+
+### If there are duplicates of affiliation in one PMID (don't work yet) ###
+SCOPUS.test.Combine.dt.wide.affiliation.afidList.na.duplicate <- anyDuplicated(SCOPUS.test.Combine.dt.wide.affiliation.afidList.na, by = "PMID")
+SCOPUS.test.Combine.dt.wide.affiliation.afidList.na.duplicate.row <- SCOPUS.test.Combine.dt.wide.affiliation.afidList.na[(SCOPUS.test.Combine.dt.wide.affiliation.afidList.na.duplicate),]
+SCOPUS.test.Combine.dt.wide.affiliation.afidList.na.duplicate.AllRows <- SCOPUS.test.Combine.dt.wide.affiliation.afidList.na[PMID == (SCOPUS.test.Combine.dt.wide.affiliation.afidList.na.duplicate.row$PMID)]
+#SCOPUS.test.Combine.dt.wide.affiliation.afidList.na.duplicate.AllRows.affilname <- paste(SCOPUS.test.Combine.dt.wide.affiliation.afidList.na.duplicate.AllRows$affilname, sep = ",")
+#SCOPUS.test.Combine.dt.wide.affiliation.afidList.na.duplicate.AllRows.affilCity <- paste(SCOPUS.test.Combine.dt.wide.affiliation.afidList.na.duplicate.AllRows$`affiliation-city`, sep = ",")
+#SCOPUS.test.Combine.dt.wide.affiliation.afidList.na.duplicate.AllRows.affilCountry <- paste(SCOPUS.test.Combine.dt.wide.affiliation.afidList.na.duplicate.AllRows$`affiliation-country`, sep = ",")
+SCOPUS.test.Combine.dt.wide.affiliation.afidList.na.duplicate.AllRows.Grouped <- group_by(SCOPUS.test.Combine.dt.wide.affiliation.afidList.na.duplicate.AllRows, PMID)
+
+
+### Selecting columns of afid, affilname, affiliation-city, affiliation-country, (and name_variant)
+SCOPUS.test.Combine.dt.wide.affiliation.afidList.na.list <- SCOPUS.test.Combine.dt.wide.affiliation.afidList.na[, .(PMID, afid, affilname, `affiliation-city`, `affiliation-country`)]
+# If there is name-variant
+# SCOPUS.test.Combine.dt.wide.affiliation.afidList.na.list <- SCOPUS.test.Combine.dt.wide.affiliation.afidList.na[, .(afid, affilname, `affiliation-city`, `affiliation-country`, name_variant)]
+
+# get authors that afid is NA
+SCOPUS.test.Combine.dt.wide.author.unnest.afid.NA <- na.omit(SCOPUS.test.Combine.dt.wide.affiliation.unnest.full.distinctAuthor, cols = "afid", invert = TRUE)
+
+# Join author names of afid == NA with affiliation names based on PMID 
+library(dplyr)
+SCOPUS.test.Combine.dt.wide.author.unnest.afid.NA.joined <- full_join(SCOPUS.test.Combine.dt.wide.author.unnest.afid.NA, SCOPUS.test.Combine.dt.wide.affiliation.afidList.na.list, by = "PMID")
+SCOPUS.test.Combine.dt.wide.author.unnest.afid.NA.joined <- SCOPUS.test.Combine.dt.wide.author.unnest.afid.NA.joined[, afid.x := NULL][, afid.y := NULL][, afid := NA]
+
+SCOPUS.test.Combine.dt.wide.author.unnest.afid.joined.NA.full<- bind_rows(SCOPUS.test.Combine.dt.wide.author.unnest.afid.joined, SCOPUS.test.Combine.dt.wide.author.unnest.afid.NA.joined)
+
+library(readr)
+write_tsv(SCOPUS.test.Combine.dt.wide.author.unnest.afid.joined.NA.full, "SCOPUSAuthorNames_Distinct_JoinedAfid_full.tsv")
+
+# how many unique PMIDs are there in the dataset for cleaning?
+# SCOPUS.test.Combine.dt.wide.author.unnest.afid.joined.NA.full.PMID <- data.table(unique(SCOPUS.test.Combine.dt.wide.author.unnest.afid.joined.NA.full$SCOPUS_PMID))
+
+### Adding the year to dataset for cleaning
+library(data.table)
+SCOPUS.test.Combine.dt.wide.author.unnest.afid.joined.NA.full.year <- SCOPUS.test.Combine.dt.wide.author.unnest.afid.joined.NA.full[, YearOfENARecord := 2008]
+
+library(readr)
+write_tsv(SCOPUS.test.Combine.dt.wide.author.unnest.afid.joined.NA.full.year, "SCOPUS_Pig_2008_AuthorNames_Distinct_JoinedAfid_full.tsv")
+View(SCOPUS.test.Combine.dt.wide.author.unnest.afid.joined.NA.full.year)
+
+
+# Create subset minus the afid 
+#library(dtplyr)
+#SCOPUS.test.Combine.dt.wide.author.unnest <- tbl_dt(SCOPUS.test.Combine.dt.wide.author.unnest)
+#SCOPUS.test.Combine.dt.wide.author.names.raw <- select(SCOPUS.test.Combine.dt.wide.author.unnest, -afid)
+
+
+# create a table with only PMID and afid list (don't work yet)
+SCOPUS.test.Combine.dt.wide.PMID.afid.raw <- data.table(PMID = SCOPUS.test.Combine.dt.wide.author.unnest$PMID, SCOPUS.afid.list = SCOPUS.test.Combine.dt.wide.author.unnest$afid)
+SCOPUS.test.Combine.dt.wide.PMID.afid <- unnest(SCOPUS.test.Combine.dt.wide.PMID.afid.raw)
+
+
+SCOPUS.test.Combine.dt.wide.afid.raw <- data.table(PMID = SCOPUS.test.Combine.dt.wide.author.unnest$PMID, SCOPUS.afid.list = SCOPUS.test.Combine.dt.wide.author.unnest$afid)
+
+SCOPUS.test.Combine.dt.wide.afid.raw.unlist <- as.matrix(unlist(SCOPUS.test.Combine.dt.wide.afid.raw))
+
+SCOPUS.test.Combine.dt.wide.afid.raw.mutate <- mutate(SCOPUS.test.Combine.dt.wide.afid.raw, SCOPUS.afid.list=strsplit(as.character(SCOPUS.afid.list), ","))
+SCOPUS.test.Combine.dt.wide.afid.raw.mutate.unnest <- unnest(SCOPUS.test.Combine.dt.wide.afid.raw.mutate)
+
+SCOPUS.test.Combine.dt.wide.afid.raw.nest <- nest(SCOPUS.test.Combine.dt.wide.afid.raw, PMID)
+SCOPUS.test.Combine.dt.wide.afid.raw.unnest <- unnest(SCOPUS.test.Combine.dt.wide.afid.raw, .drop = .drop, .id = "SCOPUS_PMID")
+
+
+SCOPUS.test.Combine.dt.wide.afid.raw.unlist <- unlist(SCOPUS.test.Combine.dt.wide.afid.raw$SCOPUS.afid.list)
+
+
+SCOPUS.test.Combine.dt.wide.author.afid.unnest <- unnest(SCOPUS.test.Combine.dt.wide.afid.raw)
+
+SCOPUS.test.Combine.dt.wide.afid.unnest <- unnest(SCOPUS.test.Combine.dt.wide.afid.raw, .id = "SCOPUS_PMID")
+
+
+SCOPUS.test.Combine.dt.wide.author.unnest.afid <- unnest(SCOPUS.test.Combine.dt.wide.author.unnest$afid)
+
+### In the case of interruption
+#subset the PMIDs
+EPMC.test.full.PMID.import.dt.long.na.omit.unique2 <- EPMC.test.full.PMID.import.dt.long.na.omit.unique[342:697,]
+
+# DownloadSCOPUSData function (download JSON/txt files) continued from interruption
+
+DownloadSCOPUSData2 <- function (PMID) {
+  library(curl)
+  library(jsonlite)
+  PMIDQuery <- paste0("PMID(", PMID)
+  SCOPUS.test.url <- paste0("https://api.elsevier.com/content/search/scopus?query=", PMIDQuery, ")&apiKey=78990569bc896922121f5c82e5d308ba&view=COMPLETE")
+  tmp <- tempfile("tmp2", tmpdir = "./SCOPUS", fileext = ".txt")
+  curl_download(SCOPUS.test.url, tmp)
+}
+
+# Downlaod hit count JSON 2
+
+library(plyr)
+library(curl)
+SCOPUS.test.raw <- do.call (cbind, adply(EPMC.test.full.PMID.import.dt.long.na.omit.unique2$PMID, 1, function(PMID){
+  SCOPUS.test.raw <- ldply(PMID, DownloadSCOPUSData2)
+}, .progress = "text")) 
+
+
+
+SCOPUS.test.Combine.dt.wide.raw.unlist <- data.table(as.matrix(unlist(SCOPUS.test.Combine.dt.wide.raw$affiliation, recursive = FALSE)))
+SCOPUS.test.Combine.dt.wide.raw.unlist.dt <- data.table(PMID = SCOPUS.test.raw.parsed.raw.PMID , authorList = SCOPUS.test.Combine.dt.wide.raw.unlist)
+SCOPUS.test.Combine.dt.wide.raw.unlist.authorList <- unnest(SCOPUS.test.Combine.dt.wide.raw.unlist.dt, .id = "SCOPUS_PMID")
+
+
+### Alternative: Cleaning routines for affiliation ###
+### create tbl_dt of selected variables (affiliation id, name, city and country)
+library(dplyr)
+SCOPUS.test.Combine.dt.wide.affiliation.unnest.tbl <- tbl_dt(SCOPUS.test.Combine.dt.wide.affiliation.unnest)
+vars <- c("afid", "affilname", "affiliation-city", "affiliation-country")
+SCOPUS.test.Combine.dt.wide.affiliation.dt.raw <- select(SCOPUS.test.Combine.dt.wide.affiliation.unnest.tbl, one_of(vars))
+
+# remove duplicates based on unique affiliation id and affiliation name 
+SCOPUS.test.Combine.dt.wide.affiliation.dt.distinct <-distinct(SCOPUS.test.Combine.dt.wide.affiliation.dt.raw, afid, affilname, .keep_all = TRUE)
+
+#SCOPUS.test.Combine.dt.wide.affiliation.dt.distinct2 <-distinct(SCOPUS.test.Combine.dt.wide.affiliation.dt.raw, afid, .keep_all = TRUE)
+
+#highlgihting the different distinct results
+#SCOPUS.test.Combine.dt.wide.affiliation.dt.distinct.antijoin <- anti_join(SCOPUS.test.Combine.dt.wide.affiliation.dt.distinct, SCOPUS.test.Combine.dt.wide.affiliation.dt.distinct2)
+
+### Create new column called affilnameCleaned, and copy the values in affilname
+SCOPUS.test.Combine.dt.wide.affiliation.dt.clean.raw <- SCOPUS.test.Combine.dt.wide.affiliation.dt.distinct[, affilnameCleaned := affilname]
+
+### to edit affilnameCleaned
+
+#if afid == x or y, affilameCleaned write as z
+SCOPUS.test.Combine.dt.wide.affiliation.dt.clean.raw[afid=="60011394" | afid=="60003417", affilnameCleaned := "Universitat Wien"]
+
+# Setting the afid as key
+setkey(SCOPUS.test.Combine.dt.wide.affiliation.dt.clean.raw, afid)
+
+### Changing the vlaue of affilname in individual record 
+SCOPUS.test.Combine.dt.wide.affiliation.dt.clean.raw[c(afid=="60000656"), affilnameCleaned := c("Seoul National University")]
+### Changing the value of affilname of a list of records 
+SCOPUS.test.Combine.dt.wide.affiliation.dt.clean.raw[c("60024834", "60005980", "60007971", "60029244", "60097542", "60031115", "60017994", "60021947", "60002106", "60021981"), affilnameCleaned := c("University of Nottingham", "Zoological Museum", "University of Copenhagen", "Veterinary Research Institute", "Central Institute for Research on Buffaloes", "University of Pennsylvania", "Yale University", "Indiana University", "Shinshu University", "Institute of Molecular and Cell Biology")]
+
+### Creating a new cleaned city and cleaned country column
+SCOPUS.test.Combine.dt.wide.affiliation.dt.clean.raw <- SCOPUS.test.Combine.dt.wide.affiliation.dt.clean.raw[, AffiliationCityCleaned := `affiliation-city`]
+SCOPUS.test.Combine.dt.wide.affiliation.dt.clean.raw <- SCOPUS.test.Combine.dt.wide.affiliation.dt.clean.raw[, AffiliationCountryCleaned := `affiliation-country`]
+
+### changing the value of cityCleaned 
+SCOPUS.test.Combine.dt.wide.affiliation.dt.clean.raw[c("60103898"), AffiliationCityCleaned := c("Tokyo")]
+
+### Changing the value of Country cleaned
+SCOPUS.test.Combine.dt.wide.affiliation.dt.clean.raw[c("60024445"), AffiliationCountryCleaned := c("Czech Republic")]
+
+### Returning a data.table of cleaned data (FINAL)
+SCOPUS.test.Combine.dt.wide.affiliation.dt.clean.dt <- SCOPUS.test.Combine.dt.wide.affiliation.dt.clean.raw[,.(afid,affilnameCleaned,AffiliationCityCleaned,AffiliationCountryCleaned)]
+SCOPUS.test.Combine.dt.wide.affiliation.dt.clean.dt.unique <- unique(SCOPUS.test.Combine.dt.wide.affiliation.dt.clean.dt, by = "affilnameCleaned")
+
+### Subset columns of PMID and afid
+SCOPUS.test.Combine.dt.wide.affiliation.unnest.PMIDafid <- SCOPUS.test.Combine.dt.wide.affiliation.unnest[,.(PMID, afid)]
+SCOPUS.test.Combine.dt.wide.affiliation.unnest.PMIDafid <- tbl_dt(SCOPUS.test.Combine.dt.wide.affiliation.unnest.PMIDafid)
+
+### join the records by afid
+library(dtplyr)
+SCOPUS.test.Combine.dt.wide.affiliation.PMIDafid.clean.dt <- left_join(SCOPUS.test.Combine.dt.wide.affiliation.unnest.PMIDafid, SCOPUS.test.Combine.dt.wide.affiliation.dt.clean.dt, by = "afid")
+setcolorder(SCOPUS.test.Combine.dt.wide.affiliation.PMIDafid.clean.dt, c("PMID", "afid", "affilnameCleaned", "AffiliationCityCleaned", "AffiliationCountryCleaned"))
+
+library(readr)
+write_csv(SCOPUS.test.Combine.dt.wide.affiliation.PMIDafid.clean.dt, "AffiliationxPMID.csv")
+### end of cleaning affiliation ###
+
+### END ###
