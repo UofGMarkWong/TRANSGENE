@@ -1,0 +1,690 @@
+### EPMC API  ### 
+#################
+
+### TO-DO: Run the ENA API scripts first in the same session OR import the list of accession number as "ENAResult.test.full.AccNum.dt" ###
+
+
+### 1. Function to search and download JSON file of core data based on accession numbers
+DownloadData <- function (Accession) {
+  library(curl)
+  library(jsonlite)
+  AccNumQuery <- paste0("EMBL_PUBS:", Accession)
+  EPMC.test.url <- paste0("http://www.ebi.ac.uk/europepmc/webservices/rest/search?query=", AccNumQuery, "&resulttype=core&cursorMark=*&pageSize=1000&format=json")
+  tmp <- tempfile("tmp", tmpdir = "./CoreData", fileext = ".txt")
+  curl_download(EPMC.test.url, tmp)
+}
+
+
+### 2. Create function to search hit count in EPMC based on accession numbers, store result in data.table
+
+
+# GetHitCount function (download JSON/txt files) continued from interruption
+GetHitCount2 <- function (Accession) {
+  library(jsonlite)
+  library(data.table)
+  AccNumQuery <- paste0("EMBL_PUBS:", Accession)
+  EPMC.test.url <- paste0("http://www.ebi.ac.uk/europepmc/webservices/rest/search?query=", AccNumQuery, "&resulttype=idlist&cursorMark=*&pageSize=1000&format=json")
+  tmp <- tempfile("tmp2", tmpdir = "./HitCount", fileext = ".txt")
+  curl_download(EPMC.test.url, tmp)
+}
+
+# Downlaod hit count JSON 
+library(curl)
+library(plyr)
+EPMC.test.raw <- do.call (cbind, adply(ENAResult.test.full.AccNum.dt2$ENAResult.test.full.AccNum, 1, function(accession){
+  EPMC.test.raw <- ldply(accession, GetHitCount2)
+}, .progress = "text")) 
+
+
+
+# GetHitCount function (download JSON/txt files)
+GetHitCount <- function (Accession) {
+  library(jsonlite)
+  library(data.table)
+  AccNumQuery <- paste0("EMBL_PUBS:", Accession)
+  EPMC.test.url <- paste0("http://www.ebi.ac.uk/europepmc/webservices/rest/search?query=", AccNumQuery, "&resulttype=idlist&cursorMark=*&pageSize=1000&format=json")
+  tmp <- tempfile("tmp", tmpdir = "./HitCount", fileext = ".txt")
+  curl_download(EPMC.test.url, tmp)
+}
+
+# Downlaod hit count JSON 
+library(curl)
+library(plyr)
+EPMC.test.raw <- do.call (cbind, adply(ENAResult.test.full.AccNum.dt$ENAResult.test.full.AccNum, 1, function(accession){
+  EPMC.test.raw <- ldply(accession, GetHitCount)
+}, .progress = "text")) 
+
+
+
+# List the files in the folder EPMC_Human_1995_FULL_1/HitCount, created by DownloadData
+EPMC.test.full.HitCount.filelist <- list.files("./HitCount", pattern = "tmp")
+
+
+### Construct a data table of accession number and number of hits in EPMC, based on parsing JSON files downloaded
+library (plyr)
+EPMC.test.full.HitCount.parsed.df <- ldply(EPMC.test.full.HitCount.filelist, function (x){
+  EPMC.test.full.HitCount.filename <- paste0("./HitCount/", x)
+  EPMC.test.full.HitCount.parsed <- fromJSON(EPMC.test.full.HitCount.filename)
+  
+  # obtain the accession number from the query
+  EPMC.test.full.HitCount.parsed.query.raw <- EPMC.test.full.HitCount.parsed$request$query 
+  library(stringr)
+  EPMC.test.full.HitCount.parsed.query.raw.split<- str_split(EPMC.test.full.HitCount.parsed.query.raw, ":", simplify = TRUE)
+  EPMC.test.full.HitCount.parsed.query.raw.AccNum <- EPMC.test.full.HitCount.parsed.query.raw.split[,2]
+  # convert the parsed JSON data, Accession Numbers and Hit Counts to data.table
+  EPMC.test.full.HitCount.parsed.df <-data.table(accession_number = EPMC.test.full.HitCount.parsed.query.raw.AccNum, Accession.hits = EPMC.test.full.HitCount.parsed$hitCount)
+},.progress = "text")
+
+# Convert the dataframe of JSON values to data.table
+EPMC.test.full.HitCount.dt <- as.data.table(EPMC.test.full.HitCount.parsed.df)
+
+# to edit hit counts 
+#EPMC.test.full.HitCount.dt[accession_number=="CB112087", Accession.hits := 0]
+
+# to remove duplicated accession numbers
+#EPMC.test.full.Accession.hits.filtered.dt <- unique(EPMC.test.full.Accession.hits.filtered.dt)
+
+### Filter tbl to Acession hits greater than or equal to 1
+library (dplyr)
+EPMC.test.full.Accession.hits.filtered.dt <- filter(EPMC.test.full.HitCount.dt, Accession.hits >= 1)
+
+# Filter tbl to Acession hits equal to 0
+library(data.table)
+EPMC.test.full.Accession.hits.nohits.dt <- filter(EPMC.test.full.HitCount.dt, Accession.hits == 0)
+EPMC.test.full.Accession.hits.nohits.combined <- data.table(accession_number = EPMC.test.full.Accession.hits.nohits.dt$accession_number, EPMC_data = 0)
+
+
+### 2b. Download json data for all filtered accesssion numbers ###
+
+library(dplyr)
+EPMC.test.raw <- do.call (cbind, adply(EPMC.test.full.Accession.hits.filtered.dt$accession_number, 1, function(accession){
+  EPMC.test.raw <- ldply(accession, DownloadData)
+}, .progress = "text")) 
+
+# List the files in the folder CoreData, created by DownloadData
+EPMC.test.raw.filelist <- list.files("./CoreData", pattern = "tmp")
+
+
+### Parse each JSON file downloaded, based on the file list
+library(plyr)
+library(jsonlite)
+library(stringr)
+EPMC.test.Combine.df <- ldply(EPMC.test.raw.filelist, function (x){
+  EPMC.test.raw.filename <- paste0("./CoreData/", x)
+  EPMC.test.raw.parsed <- fromJSON(EPMC.test.raw.filename)
+  EPMC.test.raw.parsed.raw <- EPMC.test.raw.parsed$resultList$result
+  # obtain the accession number from the query
+  EPMC.test.raw.parsed.raw.query.raw <- EPMC.test.raw.parsed$request$query 
+  EPMC.test.raw.parsed.raw.query.raw.split<- str_split(EPMC.test.raw.parsed.raw.query.raw, ":", simplify = TRUE)
+  EPMC.test.raw.parsed.raw.query.raw.AccNum <- EPMC.test.raw.parsed.raw.query.raw.split[,2]
+  # convert the parsed JSON data to data.table
+  EPMC.test.raw.parsed.dt <- data.table(as.matrix(unlist(EPMC.test.raw.parsed.raw, recursive = FALSE), rowname.force = TRUE), keep.rownames = TRUE)
+  # attach accession_number (based on query) to the parsed JSON data
+  EPMC.test.Combine.df <- data.table(accession_number = EPMC.test.raw.parsed.raw.query.raw.AccNum, EPMC_data = EPMC.test.raw.parsed.dt) 
+}, .progress = "text")
+
+# Convert the dataframe of JSON values to data.table
+EPMC.test.Combine.dt <- as.data.table(EPMC.test.Combine.df)
+
+### Spread the parsed JSON data to wide format 
+### why is fill = NA not working? and the implicit missing values, rows that aren't present became null not NA
+library(tidyr)
+EPMC.test.Combine.dt.wide.raw <- spread(EPMC.test.Combine.dt, "EPMC_data.rn", "EPMC_data.V1", fill = NA)
+library(data.table)
+setkey(EPMC.test.Combine.dt.wide.raw, accession_number)
+
+### Setting Null to NA in the data.table
+EPMC.test.Combine.dt.wide.raw[EPMC.test.Combine.dt.wide.raw == "NULL"]<-NA
+
+
+
+
+### 3. A table of affiliations for each accession number
+
+# Selecting columns that start with affiliation
+library(dplyr)
+EPMC.test.Combine.dt.wide.raw.affiliation <- select(EPMC.test.Combine.dt.wide.raw, accession_number, starts_with("affiliation"))
+
+# Unlist each column, so that NA is listed as NA, and each column is not a list of values (but becomes a data frame)
+library (plyr)
+EPMC.test.Combine.dt.wide.raw.affiliation.unlist <- ddply(EPMC.test.Combine.dt.wide.raw.affiliation, .(accession_number), unlist)
+# convert to data table
+library(data.table)
+EPMC.test.Combine.dt.wide.raw.affiliation.unlist.dt <- data.table(EPMC.test.Combine.dt.wide.raw.affiliation.unlist)
+
+
+# Combine values in affiliation and affiliation 1 by omitting NA, and store as column affiliation1
+EPMC.test.Combine.dt.wide.raw.affiliation.unlist.combine.dtraw <- EPMC.test.Combine.dt.wide.raw.affiliation.unlist.dt[,affiliation1 := na.omit(c(affiliation,affiliation1)), by = accession_number][, affiliation := NULL]
+
+
+### Getting column index and setting the column order
+# caculate the column length and then generate a sequence of that length 
+EPMC.test.full.affiliationIndexOnly <- select(EPMC.test.Combine.dt.wide.raw.affiliation.unlist.combine.dtraw, -accession_number)
+EPMC.test.full.affiliationIndexOnly.ncol <- ncol(EPMC.test.full.affiliationIndexOnly)
+EPMC.test.full.affiliationOnly.ncol.seq <- seq_len(EPMC.test.full.affiliationIndexOnly.ncol)
+
+# Write a fucntion that paste EPMC_affiliationIndex with x
+PasteEPMCaffiliationIndex <- function (x){
+  paste("affiliation", x, sep = "")
+}
+# Paste affiliation to each number in the sequence 
+EPMC.test.full.affiliationIndexOnly.order <- sapply(EPMC.test.full.affiliationOnly.ncol.seq, PasteEPMCaffiliationIndex)
+# Set column order in ascending order
+setcolorder(EPMC.test.Combine.dt.wide.raw.affiliation.unlist.combine.dtraw, c("accession_number", EPMC.test.full.affiliationIndexOnly.order))
+
+
+### Renaming the column with EPMC_ prefix and setting the column order
+# Write a fucntion that paste EPMC_affiliation with x
+PasteEPMCaffiliation <- function (x){
+  paste("EPMC_affiliation", x, sep = "_")
+}
+# Paste EPMC author to each number in the sequence 
+EPMC.test.full.affiliationOnly.order <- sapply(EPMC.test.full.affiliationOnly.ncol.seq, PasteEPMCaffiliation)
+
+### Reorder the data table with EPMC_affiliation_x FINAL
+library(data.table)
+EPMC.test.Combine.dt.wide.raw.affiliation.unlist.combine.dt <- setnames(EPMC.test.Combine.dt.wide.raw.affiliation.unlist.combine.dtraw, names(EPMC.test.Combine.dt.wide.raw.affiliation.unlist.combine.dtraw), c("accession_number", EPMC.test.full.affiliationOnly.order))
+
+library(readr)
+write_csv(EPMC.test.Combine.dt.wide.raw.affiliation.unlist.combine.dt, "EPMC_Yeast_1980to2000_Affiliations.csv")
+
+# Omit rows which EPMC affiliation 1 is NA
+library(readr)
+EPMC.test.Combine.dt.wide.raw.affiliation.unlist.combine.dt.na.omit <- na.omit(EPMC.test.Combine.dt.wide.raw.affiliation.unlist.combine.dt, cols="EPMC_affiliation_1")
+write_csv(EPMC.test.Combine.dt.wide.raw.affiliation.unlist.combine.dt.na.omit, "EPMC_Yeast_1980to200_affiliations.csv")
+
+library(tidyr)
+library(dplyr)
+EPMC.test.Combine.dt.wide.raw.affiliation.names <- select(EPMC.test.Combine.dt.wide.raw.affiliation.unlist.combine.dt, -accession_number)
+EPMC.test.Combine.dt.wide.raw.affiliation.names.long.raw <- gather(EPMC.test.Combine.dt.wide.raw.affiliation.names, EPMC_affiliation_index, EPMC_affiliation)
+EPMC.test.Combine.dt.wide.raw.affiliation.names.long <- select(EPMC.test.Combine.dt.wide.raw.affiliation.names.long.raw, EPMC_affiliation)
+EPMC.test.Combine.dt.wide.raw.affiliation.names.long.na.omit <- na.omit(EPMC.test.Combine.dt.wide.raw.affiliation.names.long)
+
+require(dplyr)
+library(data.table)
+EPMC.test.Combine.dt.wide.raw.affiliation.names.long.na.omit.count <- data.table(count(EPMC.test.Combine.dt.wide.raw.affiliation.names.long.na.omit, EPMC_affiliation, sort = TRUE))
+setnames(EPMC.test.Combine.dt.wide.raw.affiliation.names.long.na.omit.count, "n", "EPMC_affiliation_times_authored")
+
+# order the results by times authored in descending order (FINAL)
+#EPMC.test.Combine.dt.wide.raw.affiliation.names.long.na.omit.count.ordered <- EPMC.test.Combine.dt.wide.raw.affiliation.names.long.na.omit.count[order(-EPMC_affiliation_times_authored)]
+
+library(readr)
+write_csv(EPMC.test.Combine.dt.wide.raw.affiliation.names.long.na.omit.count, "EPMC_Yeast_1980to2000_Affiliations_Count.csv")
+
+
+### 4. A table of PMID for each accession number
+
+# Selecting columns that start with PMID 
+library(dplyr)
+EPMC.test.Combine.dt.wide.raw.PMID <- select(EPMC.test.Combine.dt.wide.raw, accession_number, starts_with("pmid"))
+
+# Unlist each column, so that NA is listed as NA, and each column is not a list of values (but becomes a data frame)
+library (plyr)
+EPMC.test.Combine.dt.wide.raw.PMID.unlist <- ddply(EPMC.test.Combine.dt.wide.raw.PMID, .(accession_number), unlist)
+# convert to data table
+library(data.table)
+EPMC.test.Combine.dt.wide.raw.PMID.unlist.dt <- data.table(EPMC.test.Combine.dt.wide.raw.PMID.unlist)
+# Combine values in pmid and pmid 1 by omitting NA, and store as column pmid1
+EPMC.test.Combine.dt.wide.raw.PMID.unlist.combine.dtraw <- EPMC.test.Combine.dt.wide.raw.PMID.unlist.dt[,pmid1 := na.omit(c(pmid,pmid1)), by = accession_number][, pmid := NULL]
+
+# in cases where there is only one pmid
+#EPMC.test.Combine.dt.wide.raw.PMID.unlist.combine.dtraw <- EPMC.test.Combine.dt.wide.raw.PMID.unlist.dt
+
+### Getting column index and setting the column order
+# caculate the column length and then generate a sequence of that length 
+EPMC.test.full.PMIDIndexOnly <- select(EPMC.test.Combine.dt.wide.raw.PMID.unlist.combine.dtraw, -accession_number)
+EPMC.test.full.PMIDIndexOnly.ncol <- ncol(EPMC.test.full.PMIDIndexOnly)
+EPMC.test.full.PMIDOnly.ncol.seq <- seq_len(EPMC.test.full.PMIDIndexOnly.ncol)
+
+# Write a fucntion that paste EPMC_PMIDIndex with x
+PasteEPMCPMIDIndex <- function (x){
+  paste("pmid", x, sep = "")
+}
+# Paste PMID to each number in the sequence 
+EPMC.test.full.PMIDIndexOnly.order <- sapply(EPMC.test.full.PMIDOnly.ncol.seq, PasteEPMCPMIDIndex)
+# Set column order in ascending order
+setcolorder(EPMC.test.Combine.dt.wide.raw.PMID.unlist.combine.dtraw, c("accession_number", EPMC.test.full.PMIDIndexOnly.order))
+
+
+### Renaming the column with EPMC_ prefix and setting the column order
+
+# Write a fucntion that paste EPMC_PMID with x
+PasteEPMCPMID <- function (x){
+  paste("EPMC_PMID", x, sep = "_")
+}
+# Paste EPMC author to each number in the sequence 
+EPMC.test.full.PMIDOnly.order <- sapply(EPMC.test.full.PMIDOnly.ncol.seq, PasteEPMCPMID)
+
+### Reorder the data table with EPMC_PMID_x FINAL
+library(data.table)
+EPMC.test.Combine.dt.wide.raw.PMID.unlist.combine.dt <- setnames(EPMC.test.Combine.dt.wide.raw.PMID.unlist.combine.dtraw, names(EPMC.test.Combine.dt.wide.raw.PMID.unlist.combine.dtraw), c("accession_number", EPMC.test.full.PMIDOnly.order))
+
+library(readr)
+write_csv(EPMC.test.Combine.dt.wide.raw.PMID.unlist.combine.dt, "EPMC_Pig_2008_PMID.csv")
+
+
+### 5. A table of DOI for each accession number ###
+
+# Selecting columns that start with DOI 
+library(dplyr)
+EPMC.test.Combine.dt.wide.raw.DOI <- select(EPMC.test.Combine.dt.wide.raw, accession_number, starts_with("doi"))
+
+# Unlist each column, so that NA is listed as NA, and each column is not a list of values (but becomes a data frame)
+library (plyr)
+EPMC.test.Combine.dt.wide.raw.DOI.unlist <- ddply(EPMC.test.Combine.dt.wide.raw.DOI, .(accession_number), unlist)
+
+# convert to data table
+library(data.table)
+EPMC.test.Combine.dt.wide.raw.DOI.unlist.dt <- data.table(EPMC.test.Combine.dt.wide.raw.DOI.unlist)
+
+# Combine values in DOI and DOI 1 by omitting NA, and store as column DOI1
+EPMC.test.Combine.dt.wide.raw.DOI.unlist.combine.dtraw <- EPMC.test.Combine.dt.wide.raw.DOI.unlist.dt[,doi1 := na.omit(c(doi,doi1)), by = accession_number][, doi := NULL]
+
+### Getting column index and setting the column order
+# caculate the column length and then generate a sequence of that length 
+EPMC.test.full.DOIIndexOnly <- select(EPMC.test.Combine.dt.wide.raw.DOI.unlist.combine.dtraw, -accession_number)
+EPMC.test.full.DOIIndexOnly.ncol <- ncol(EPMC.test.full.DOIIndexOnly)
+EPMC.test.full.DOIOnly.ncol.seq <- seq_len(EPMC.test.full.DOIIndexOnly.ncol)
+
+# Write a fucntion that paste EPMC_DOIIndex with x
+PasteEPMCDOIIndex <- function (x){
+  paste("doi", x, sep = "")
+}
+# Paste DOI to each number in the sequence 
+EPMC.test.full.DOIIndexOnly.order <- sapply(EPMC.test.full.DOIOnly.ncol.seq, PasteEPMCDOIIndex)
+# Set column order in ascending order
+setcolorder(EPMC.test.Combine.dt.wide.raw.DOI.unlist.combine.dtraw, c("accession_number", EPMC.test.full.DOIIndexOnly.order))
+
+
+### Renaming the column with EPMC_ prefix and setting the column order
+# Write a fucntion that paste EPMC_DOI with x
+PasteEPMCDOI <- function (x){
+  paste("EPMC_DOI", x, sep = "_")
+}
+# Paste EPMC author to each number in the sequence 
+EPMC.test.full.DOIOnly.order <- sapply(EPMC.test.full.DOIOnly.ncol.seq, PasteEPMCDOI)
+
+### Reorder the data table with EPMC_DOI_x FINAL
+library(data.table)
+EPMC.test.Combine.dt.wide.raw.DOI.unlist.combine.dt <- setnames(EPMC.test.Combine.dt.wide.raw.DOI.unlist.combine.dtraw, names(EPMC.test.Combine.dt.wide.raw.DOI.unlist.combine.dtraw), c("accession_number", EPMC.test.full.DOIOnly.order))
+
+library(readr)
+write_csv(EPMC.test.Combine.dt.wide.raw.DOI.unlist.combine.dt, "EPMC_Yeast_1980to200_DOI.csv")
+
+
+
+### 6. A table of CitationIndex for each accession number ###
+
+# Selecting columns that start with CitationIndex 
+library(dplyr)
+EPMC.test.Combine.dt.wide.raw.CitationIndex <- select(EPMC.test.Combine.dt.wide.raw, accession_number, starts_with("citedByCount"))
+
+# Unlist each column, so that NA is listed as NA, and each column is not a list of values (but becomes a data frame)
+library (plyr)
+EPMC.test.Combine.dt.wide.raw.CitationIndex.unlist <- ddply(EPMC.test.Combine.dt.wide.raw.CitationIndex, .(accession_number), unlist)
+
+# convert to data table
+library(data.table)
+EPMC.test.Combine.dt.wide.raw.CitationIndex.unlist.dt <- data.table(EPMC.test.Combine.dt.wide.raw.CitationIndex.unlist)
+
+# Combine values in CitationIndex and CitationIndex 1 by omitting NA, and store as column CitationIndex1
+EPMC.test.Combine.dt.wide.raw.CitationIndex.unlist.combine.dtraw <- EPMC.test.Combine.dt.wide.raw.CitationIndex.unlist.dt[,citedByCount1 := na.omit(c(citedByCount,citedByCount1)), by = accession_number][, citedByCount := NULL]
+
+### Getting column index and setting the column order
+# caculate the column length and then generate a sequence of that length 
+EPMC.test.full.CitationIndexIndexOnly <- select(EPMC.test.Combine.dt.wide.raw.CitationIndex.unlist.combine.dtraw, -accession_number)
+EPMC.test.full.CitationIndexIndexOnly.ncol <- ncol(EPMC.test.full.CitationIndexIndexOnly)
+EPMC.test.full.CitationIndexOnly.ncol.seq <- seq_len(EPMC.test.full.CitationIndexIndexOnly.ncol)
+
+# Write a fucntion that paste EPMC_CitationIndexIndex with x
+PasteEPMCCitationIndexIndex <- function (x){
+  paste("citedByCount", x, sep = "")
+}
+# Paste CitationIndex to each number in the sequence 
+EPMC.test.full.CitationIndexIndexOnly.order <- sapply(EPMC.test.full.CitationIndexOnly.ncol.seq, PasteEPMCCitationIndexIndex)
+# Set column order in ascending order
+setcolorder(EPMC.test.Combine.dt.wide.raw.CitationIndex.unlist.combine.dtraw, c("accession_number", EPMC.test.full.CitationIndexIndexOnly.order))
+
+### Renaming the column with EPMC_ prefix and setting the column order
+
+# Write a fucntion that paste EPMC_CitationIndex with x
+PasteEPMCCitationIndex <- function (x){
+  paste("EPMC_CitationIndex", x, sep = "_")
+}
+# Paste EPMC author to each number in the sequence 
+EPMC.test.full.CitationIndexOnly.order <- sapply(EPMC.test.full.CitationIndexOnly.ncol.seq, PasteEPMCCitationIndex)
+
+### Reorder the data table with EPMC_CitationIndex_x FINAL
+library(data.table)
+EPMC.test.Combine.dt.wide.raw.CitationIndex.unlist.combine.dt <- setnames(EPMC.test.Combine.dt.wide.raw.CitationIndex.unlist.combine.dtraw, names(EPMC.test.Combine.dt.wide.raw.CitationIndex.unlist.combine.dtraw), c("accession_number", EPMC.test.full.CitationIndexOnly.order))
+
+library(readr)
+write_csv(EPMC.test.Combine.dt.wide.raw.CitationIndex.unlist.combine.dt, "EPMC_Yeast_1980to200_CitationIndex.csv")
+
+
+
+### 7. A table of Article title for each accession number ###
+
+# Selecting columns that start with title 
+library(dplyr)
+EPMC.test.Combine.dt.wide.raw.title <- select(EPMC.test.Combine.dt.wide.raw, accession_number, starts_with("title"))
+
+# Unlist each column, so that NA is listed as NA, and each column is not a list of values (but becomes a data frame)
+library (plyr)
+EPMC.test.Combine.dt.wide.raw.title.unlist <- ddply(EPMC.test.Combine.dt.wide.raw.title, .(accession_number), unlist)
+
+# convert to data table
+library(data.table)
+EPMC.test.Combine.dt.wide.raw.title.unlist.dt <- data.table(EPMC.test.Combine.dt.wide.raw.title.unlist)
+
+# Combine values in title and title 1 by omitting NA, and store as column title1
+EPMC.test.Combine.dt.wide.raw.title.unlist.combine.dtraw <- EPMC.test.Combine.dt.wide.raw.title.unlist.dt[,title1 := na.omit(c(title,title1)), by = accession_number][, title := NULL]
+
+### Getting column index and setting the column order
+# caculate the column length and then generate a sequence of that length 
+EPMC.test.full.titleIndexOnly <- select(EPMC.test.Combine.dt.wide.raw.title.unlist.combine.dtraw, -accession_number)
+EPMC.test.full.titleIndexOnly.ncol <- ncol(EPMC.test.full.titleIndexOnly)
+EPMC.test.full.titleOnly.ncol.seq <- seq_len(EPMC.test.full.titleIndexOnly.ncol)
+
+# Write a fucntion that paste EPMC_titleIndex with x
+PasteEPMCtitleIndex <- function (x){
+  paste("title", x, sep = "")
+}
+# Paste title to each number in the sequence 
+EPMC.test.full.titleIndexOnly.order <- sapply(EPMC.test.full.titleOnly.ncol.seq, PasteEPMCtitleIndex)
+# Set column order in ascending order
+setcolorder(EPMC.test.Combine.dt.wide.raw.title.unlist.combine.dtraw, c("accession_number", EPMC.test.full.titleIndexOnly.order))
+
+### Renaming the column with EPMC_ prefix and setting the column order
+
+# Write a fucntion that paste EPMC_title with x
+PasteEPMCtitle <- function (x){
+  paste("EPMC_title", x, sep = "_")
+}
+# Paste EPMC author to each number in the sequence 
+EPMC.test.full.titleOnly.order <- sapply(EPMC.test.full.titleOnly.ncol.seq, PasteEPMCtitle)
+
+### Reorder the data table with EPMC_title_x FINAL
+library(data.table)
+EPMC.test.Combine.dt.wide.raw.title.unlist.combine.dt <- setnames(EPMC.test.Combine.dt.wide.raw.title.unlist.combine.dtraw, names(EPMC.test.Combine.dt.wide.raw.title.unlist.combine.dtraw), c("accession_number", EPMC.test.full.titleOnly.order))
+
+library(readr)
+write_csv(EPMC.test.Combine.dt.wide.raw.title.unlist.combine.dt, "EPMC_Yeast_1980to200_ArticleTitle.csv")
+
+
+### 8. A table of whether the article has References for each accession number ###
+
+# Selecting columns that start with hasReferences 
+library(dplyr)
+EPMC.test.Combine.dt.wide.raw.hasReferences <- select(EPMC.test.Combine.dt.wide.raw, accession_number, starts_with("hasReferences"))
+
+# Unlist each column, so that NA is listed as NA, and each column is not a list of values (but becomes a data frame)
+library (plyr)
+EPMC.test.Combine.dt.wide.raw.hasReferences.unlist <- ddply(EPMC.test.Combine.dt.wide.raw.hasReferences, .(accession_number), unlist)
+
+# convert to data table
+library(data.table)
+EPMC.test.Combine.dt.wide.raw.hasReferences.unlist.dt <- data.table(EPMC.test.Combine.dt.wide.raw.hasReferences.unlist)
+
+# Combine values in hasReferences and hasReferences 1 by omitting NA, and store as column hasReferences1
+EPMC.test.Combine.dt.wide.raw.hasReferences.unlist.combine.dtraw <- EPMC.test.Combine.dt.wide.raw.hasReferences.unlist.dt[,hasReferences1 := na.omit(c(hasReferences,hasReferences1)), by = accession_number][, hasReferences := NULL]
+
+
+### Getting column index and setting the column order
+# caculate the column length and then generate a sequence of that length 
+EPMC.test.full.hasReferencesIndexOnly <- select(EPMC.test.Combine.dt.wide.raw.hasReferences.unlist.combine.dtraw, -accession_number)
+EPMC.test.full.hasReferencesIndexOnly.ncol <- ncol(EPMC.test.full.hasReferencesIndexOnly)
+EPMC.test.full.hasReferencesOnly.ncol.seq <- seq_len(EPMC.test.full.hasReferencesIndexOnly.ncol)
+
+# Write a fucntion that paste EPMC_hasReferencesIndex with x
+PasteEPMChasReferencesIndex <- function (x){
+  paste("hasReferences", x, sep = "")
+}
+# Paste hasReferences to each number in the sequence 
+EPMC.test.full.hasReferencesIndexOnly.order <- sapply(EPMC.test.full.hasReferencesOnly.ncol.seq, PasteEPMChasReferencesIndex)
+# Set column order in ascending order
+setcolorder(EPMC.test.Combine.dt.wide.raw.hasReferences.unlist.combine.dtraw, c("accession_number", EPMC.test.full.hasReferencesIndexOnly.order))
+
+### Renaming the column with EPMC_ prefix and setting the column order
+
+# Write a fucntion that paste EPMC_hasReferences with x
+PasteEPMChasReferences <- function (x){
+  paste("EPMC_hasReferences", x, sep = "_")
+}
+# Paste EPMC author to each number in the sequence 
+EPMC.test.full.hasReferencesOnly.order <- sapply(EPMC.test.full.hasReferencesOnly.ncol.seq, PasteEPMChasReferences)
+
+### Reorder the data table with EPMC_hasReferences_x FINAL
+library(data.table)
+EPMC.test.Combine.dt.wide.raw.hasReferences.unlist.combine.dt <- setnames(EPMC.test.Combine.dt.wide.raw.hasReferences.unlist.combine.dtraw, names(EPMC.test.Combine.dt.wide.raw.hasReferences.unlist.combine.dtraw), c("accession_number", EPMC.test.full.hasReferencesOnly.order))
+
+library(readr)
+write_csv(EPMC.test.Combine.dt.wide.raw.hasReferences.unlist.combine.dt, "EPMC_Yeast_1980to200_hasReferences.csv")
+
+
+### 9. A table of article Publication Date for each accession number ###
+
+# Selecting columns that start with PubDate 
+library(dplyr)
+EPMC.test.Combine.dt.wide.raw.PubDate <- select(EPMC.test.Combine.dt.wide.raw, accession_number, starts_with("firstPublicationDate"))
+
+# Unlist each column, so that NA is listed as NA, and each column is not a list of values (but becomes a data frame)
+library (plyr)
+EPMC.test.Combine.dt.wide.raw.PubDate.unlist <- ddply(EPMC.test.Combine.dt.wide.raw.PubDate, .(accession_number), unlist)
+
+# convert to data table
+library(data.table)
+EPMC.test.Combine.dt.wide.raw.PubDate.unlist.dt <- data.table(EPMC.test.Combine.dt.wide.raw.PubDate.unlist)
+
+# Combine values in PubDate and PubDate 1 by omitting NA, and store as column PubDate1
+EPMC.test.Combine.dt.wide.raw.PubDate.unlist.combine.dtraw <- EPMC.test.Combine.dt.wide.raw.PubDate.unlist.dt[,firstPublicationDate1 := na.omit(c(firstPublicationDate,firstPublicationDate1)), by = accession_number][, firstPublicationDate := NULL]
+
+### Getting column index and setting the column order
+# caculate the column length and then generate a sequence of that length 
+EPMC.test.full.PubDateIndexOnly <- select(EPMC.test.Combine.dt.wide.raw.PubDate.unlist.combine.dtraw, -accession_number)
+EPMC.test.full.PubDateIndexOnly.ncol <- ncol(EPMC.test.full.PubDateIndexOnly)
+EPMC.test.full.PubDateOnly.ncol.seq <- seq_len(EPMC.test.full.PubDateIndexOnly.ncol)
+
+# Write a fucntion that paste EPMC_PubDateIndex with x
+PasteEPMCPubDateIndex <- function (x){
+  paste("firstPublicationDate", x, sep = "")
+}
+# Paste PubDate to each number in the sequence 
+EPMC.test.full.PubDateIndexOnly.order <- sapply(EPMC.test.full.PubDateOnly.ncol.seq, PasteEPMCPubDateIndex)
+# Set column order in ascending order
+setcolorder(EPMC.test.Combine.dt.wide.raw.PubDate.unlist.combine.dtraw, c("accession_number", EPMC.test.full.PubDateIndexOnly.order))
+
+### Renaming the column with EPMC_ prefix and setting the column order
+
+# Write a fucntion that paste EPMC_PubDate with x
+PasteEPMCPubDate <- function (x){
+  paste("EPMC_PubDate", x, sep = "_")
+}
+# Paste EPMC author to each number in the sequence 
+EPMC.test.full.PubDateOnly.order <- sapply(EPMC.test.full.PubDateOnly.ncol.seq, PasteEPMCPubDate)
+
+### Reorder the data table with EPMC_PubDate_x FINAL
+library(data.table)
+EPMC.test.Combine.dt.wide.raw.PubDate.unlist.combine.dt <- setnames(EPMC.test.Combine.dt.wide.raw.PubDate.unlist.combine.dtraw, names(EPMC.test.Combine.dt.wide.raw.PubDate.unlist.combine.dtraw), c("accession_number", EPMC.test.full.PubDateOnly.order))
+
+library(readr)
+write_csv(EPMC.test.Combine.dt.wide.raw.PubDate.unlist.combine.dt, "EPMC_Yeast_1980to200_PubDate.csv")
+
+
+### 10. A table of article PMCID for each accession number ###
+
+# Selecting columns that start with PMCID 
+library(dplyr)
+EPMC.test.Combine.dt.wide.raw.PMCID <- select(EPMC.test.Combine.dt.wide.raw, accession_number, starts_with("pmcid"))
+
+# Unlist each column, so that NA is listed as NA, and each column is not a list of values (but becomes a data frame)
+library (plyr)
+EPMC.test.Combine.dt.wide.raw.PMCID.unlist <- ddply(EPMC.test.Combine.dt.wide.raw.PMCID, .(accession_number), unlist)
+
+# convert to data table
+library(data.table)
+EPMC.test.Combine.dt.wide.raw.PMCID.unlist.dt <- data.table(EPMC.test.Combine.dt.wide.raw.PMCID.unlist)
+
+# Combine values in PMCID and PMCID 1 by omitting NA, and store as column PMCID1
+EPMC.test.Combine.dt.wide.raw.PMCID.unlist.combine.dtraw <- EPMC.test.Combine.dt.wide.raw.PMCID.unlist.dt[,pmcid1 := na.omit(c(pmcid,pmcid1)), by = accession_number][, pmcid := NULL]
+
+### Getting column index and setting the column order
+# caculate the column length and then generate a sequence of that length 
+EPMC.test.full.PMCIDIndexOnly <- select(EPMC.test.Combine.dt.wide.raw.PMCID.unlist.combine.dtraw, -accession_number)
+EPMC.test.full.PMCIDIndexOnly.ncol <- ncol(EPMC.test.full.PMCIDIndexOnly)
+EPMC.test.full.PMCIDOnly.ncol.seq <- seq_len(EPMC.test.full.PMCIDIndexOnly.ncol)
+
+# Write a fucntion that paste EPMC_PMCIDIndex with x
+PasteEPMCPMCIDIndex <- function (x){
+  paste("pmcid", x, sep = "")
+}
+# Paste PMCID to each number in the sequence 
+EPMC.test.full.PMCIDIndexOnly.order <- sapply(EPMC.test.full.PMCIDOnly.ncol.seq, PasteEPMCPMCIDIndex)
+# Set column order in ascending order
+setcolorder(EPMC.test.Combine.dt.wide.raw.PMCID.unlist.combine.dtraw, c("accession_number", EPMC.test.full.PMCIDIndexOnly.order))
+
+### Renaming the column with EPMC_ prefix and setting the column order
+
+# Write a fucntion that paste EPMC_PMCID with x
+PasteEPMCPMCID <- function (x){
+  paste("EPMC_PMCID", x, sep = "_")
+}
+# Paste EPMC author to each number in the sequence 
+EPMC.test.full.PMCIDOnly.order <- sapply(EPMC.test.full.PMCIDOnly.ncol.seq, PasteEPMCPMCID)
+
+### Reorder the data table with EPMC_PMCID_x FINAL
+library(data.table)
+EPMC.test.Combine.dt.wide.raw.PMCID.unlist.combine.dt <- setnames(EPMC.test.Combine.dt.wide.raw.PMCID.unlist.combine.dtraw, names(EPMC.test.Combine.dt.wide.raw.PMCID.unlist.combine.dtraw), c("accession_number", EPMC.test.full.PMCIDOnly.order))
+
+# write CSV for matching with PMCID affiliations dataset
+library(readr)
+write_csv(EPMC.test.Combine.dt.wide.raw.PMCID.unlist.combine.dt, "EPMC_Yeast_1980to200_PMCID.csv")
+
+
+
+
+
+### Loop search for EPMC data for authors full names on accession number with hits, and construct a data frame ### (need to use new GetData)
+library (plyr)
+library(data.table)
+
+EPMC.test.Authors.dtraw1.unlist.fullName <- do.call (cbind, adply(EPMC.test.Accession.hits.filtered.dt$accession_number, 1, function(accession){
+  library(dplyr)
+  EPMC.test.raw <- ldply(accession, GetData, .id = NULL)
+  EPMC.test.Combine.df <- data.table(accession_number = accession, EPMC_data = EPMC.test.raw) 
+  
+  # Convert data frame of EPMC results to tbl 
+  EPMC.test.Combine.dt <- data.table(EPMC.test.Combine.df)
+  
+  EPMC.test.accession <- accession
+  
+  EPMC.test.Authors.dtraw1 <- EPMC.test.Combine.dt[EPMC_data.rn == "authorList.author"]
+  if (nrow(EPMC.test.Authors.dtraw1) < 1) {
+    EPMC.test.Authors.dtraw1 <- data.table(accession_number = EPMC.test.accession, EPMC_data.rn = "authorList.author" , EPMC_data.V1 = NA)
+  }
+  EPMC.test.Authors.dtraw1.unlist <- unlist(EPMC.test.Authors.dtraw1$EPMC_data.V1, recursive = FALSE)
+  EPMC.test.Authors.dtraw1.unlist.dt <- as.data.table(EPMC.test.Authors.dtraw1.unlist)
+  EPMC.test.Authors.dtraw1.unlist.fullName <- select(EPMC.test.Authors.dtraw1.unlist.dt, contains("fullName"))
+  
+  #library(tidyr)
+  #EPMC.test.Authors.dtraw1.unlist.fullName.long <- gather(EPMC.test.Authors.dtraw1.unlist.fullName, article, EPMC_author_fullName)
+}, .id = NULL))
+
+View(EPMC.test.Combine.dt)
+
+
+
+EPMC.test.Authors.Combine2.df <- do.call (cbind, adply(EPMC.test.Accession.hits.filtered.dt$accession_number, 1, function(accession){
+  library(dplyr)
+  EPMC.test.raw <- ldply(accession, GetData, .id = NULL)
+  EPMC.test.Combine.df <- data.table(accession_number = accession, EPMC_data = EPMC.test.raw) 
+  
+  # Convert data frame of EPMC results to tbl 
+  EPMC.test.Combine.dt <- data.table(EPMC.test.Combine.df)
+  
+  EPMC.test.accession <- accession
+  
+  # filter result to author full names
+  
+  EPMC.test.Authors.dtraw1 <- EPMC.test.Combine.dt[EPMC_data.rn == "authorList.author"]
+  if (nrow(EPMC.test.Authors.dtraw1) < 1) {
+    EPMC.test.Authors.dtraw1 <- data.table(accession_number = EPMC.test.accession, EPMC_data.rn = "authorList.author" , EPMC_data.V1 = NA)
+  } 
+  EPMC.test.Authors.dtraw1.unlist <- unlist(EPMC.test.Authors.dtraw1$EPMC_data.V1, recursive = FALSE)
+  EPMC.test.Authors.dtraw1.unlist.dt <- as.data.table(EPMC.test.Authors.dtraw1.unlist)
+  EPMC.test.Authors.dtraw1.unlist.fullName <- select(EPMC.test.Authors.dtraw1.unlist.dt, contains("fullName"))
+  
+  library(tidyr)
+  EPMC.test.Authors.dtraw1.unlist.fullName.long <- gather(EPMC.test.Authors.dtraw1.unlist.fullName, article, EPMC_author_fullName)
+  ### generate unique row ids for each author
+  EPMC.test.Authors.dtraw1.unlist.fullName.long.Index <- rowid(EPMC.test.Authors.dtraw1.unlist.fullName.long$article, prefix="EPMC_author_")
+  EPMC.test.Authors.dtraw1.unlist.fullName.dt <- data.table(EPMC.test.Authors.dtraw1.unlist.fullName.long, EPMC.test.Authors.dtraw1.unlist.fullName.long.Index)
+  EPMC.test.Authors.Combine2.df <- spread(EPMC.test.Authors.dtraw1.unlist.fullName.dt, EPMC.test.Authors.dtraw1.unlist.fullName.long.Index, EPMC_author_fullName)
+}, .id = NULL))
+
+#EPMC.test.Authors.dtraw1 <- filter(EPMC.test.Combine.dt, EPMC_data.rn == "authorList.author.fullName1")
+EPMC.test.Authors.dtraw1 <- filter(EPMC.test.Combine.dt, grepl("fullName", EPMC_data.rn))
+if (nrow(EPMC.test.Authors.dtraw1) < 1) {
+  EPMC.test.Authors.dtraw1 <-data.table(accession_number = EPMC.test.accession, EPMC_data.rn = "authorList.author.fullName" , EPMC_data.V1 = NA)
+} 
+
+#EPMC.test.Authors.dtraw2 <- filter(EPMC.test.Combine.dt, EPMC_data.rn == "authorList.author.fullName2")
+#if (nrow(EPMC.test.Authors.dtraw2) < 1) {
+#  EPMC.test.Authors.dtraw2 <-data.table(accession_number = EPMC.test.accession, EPMC_data.rn = "authorList.author.fullName2", EPMC_data.V1 = NA)
+#} 
+
+#EPMC.test.Authors.Combine.df <- bind_rows(EPMC.test.Authors.dtraw1, EPMC.test.Authors.dtraw2, .id=NULL)
+EPMC.test.Authors.Combine.df <- data.table(EPMC.test.Authors.dtraw1)
+
+### generate unique row ids for each author
+EPMC.test.AuthorsIndex <- rowid(EPMC.test.Authors.Combine.df$accession_number, prefix="EPMC author ")
+EPMC.test.Authors.Combine2.df <- data.table(EPMC.test.Authors.Combine.df, EPMC.test.AuthorsIndex)
+
+## Convert data frame of EPMC results to tbl 
+EPMC.test.Authors.Combine.dtraw <- data.table(EPMC.test.Authors.Combine2.df)
+#EPMC.test.Authors.Combine.dtraw <- select(EPMC.test.Authors.Combine.dt, -EPMC_data.rn)
+
+
+## spreading author number variables into columns and tidy format
+library(tidyr)
+EPMC.test.full.Authors.wide <- spread(EPMC.test.Authors.Combine.dtraw, EPMC_data.rn, EPMC_data.V1)
+
+
+
+### Setting the column order (not done yet)
+# caculate the column length and then generate a sequence of that length 
+EPMC.test.full.AuthorsOnly <- select(EPMC.test.full.Authors.wide, -accession_number)
+EPMC.test.full.AuthorsOnly.ncol <- ncol(EPMC.test.full.AuthorsOnly)
+EPMC.test.full.AuthorsOnly.ncol.seq <- seq_len(EPMC.test.full.AuthorsOnly.ncol)
+
+# Write a fucntion that paste EPMC author with x
+PasteEPMCAuthor<- function (x){
+  paste("EPMC author", x, sep = " ")
+}
+# Paste EPMC author to each number in the sequence 
+EPMC.test.full.AuthorsOnly.order <- sapply(EPMC.test.full.AuthorsOnly.ncol.seq, PasteEPMCAuthor)
+
+# Reorder the tbl with AuthorsOnly index
+library(data.table)
+setcolorder(EPMC.test.full.Authors.wide, c("accession_number", EPMC.test.full.AuthorsOnly.order))
+
+# Write csv 
+#library(readr)
+#write_csv(EPMC.test.full.Authors.wide, "EPMCtest_Human_1990to1992_ArticleAuthors.csv")
+
+
+
+### For Citation data ###
+library(jsonlite)
+EPMC.RefList.test <- GetCitation("6190133")
+test.PMID <- "6190133"
+EPMC.rd.citation.url<- paste0("http://www.ebi.ac.uk/europepmc/webservices/rest/MED/", test.PMID, "/references/1/1000/json")
+EPMC.rd.refList.parsed <- fromJSON(EPMC.rd.citation.url, flatten = TRUE)
+
+library(data.table)
+EPMC.rd.refList.from <- EPMC.rd.parsed$request
+EPMC.rd.refList.to <- EPMC.rd.parsed$referenceList
+EPMC.rd.refList.from.table <- data.table(as.matrix(unlist(EPMC.rd.refList.from), rowname.force = TRUE),keep.rownames = TRUE)
+EPMC.rd.refList.to.table <- data.table(as.matrix(unlist(EPMC.rd.refList.to), rowname.force = TRUE),keep.rownames = TRUE)
+
+### END ###
