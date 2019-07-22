@@ -14,6 +14,8 @@ More details about the repository we created see: https://datashare.is.ed.ac.uk/
 
 # License
 
+Creative Commons Attribution 4.0 International Public License
+
 Creative Commons License: Attribution 4.0 International
 http://creativecommons.org/licenses/by/4.0/legalcode
 
