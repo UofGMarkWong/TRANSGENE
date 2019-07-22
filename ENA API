@@ -1,0 +1,550 @@
+### ENA API ###
+
+
+### TO-DO: Use Serach and Replace All to change the YEAR and SPECIES required for download ###
+
+### 1. Download the xml file from the ENA warehouse
+
+#count the number of results - to determine how many offsets/pagination needed
+ENAurl.test.full.resultcount.url = "http://www.ebi.ac.uk/ena/data/warehouse/search?query=%22tax_eq(9606)%20AND%20first_public%3E=2005-01-01%20AND%20first_public%3C=2005-12-31%22&result=sequence_release&display=txt&resultcount"
+ENAurl.test.full.resultcount <- readLines(ENAurl.test.full.resultcount.url)
+
+## download the xml files with curl 
+
+#Searching for Human, first public date >=  and first public date <=
+
+library(curl)
+ENAurl.test.full = "http://www.ebi.ac.uk/ena/data/warehouse/search?query=%22tax_eq(9606)%20AND%20first_public%3E=2005-01-01%20AND%20first_public%3C=2005-12-31%22&result=sequence_release&display=xml&offset=1&length=100000"
+curl_download(ENAurl.test.full, "ENA_Human_2005_XML_curl.xml")
+
+## Start here if there is offset 
+#Searching for Human, first public date >=  and first public date <=
+
+library(curl)
+ENAurl.test.full = "http://www.ebi.ac.uk/ena/data/warehouse/search?query=%22tax_eq(9606)%20AND%20first_public%3E=2005-01-01%20AND%20first_public%3C=2005-12-31%22&result=sequence_release&display=xml&offset=1&length=100000"
+curl_download(ENAurl.test.full, "ENA_Human_2005_XML_1_curl.xml")
+
+# offset by 100001
+library(curl)
+ENAurl.test.full = "http://www.ebi.ac.uk/ena/data/warehouse/search?query=%22tax_eq(9606)%20AND%20first_public%3E=2005-01-01%20AND%20first_public%3C=2005-12-31%22&result=sequence_release&display=xml&offset=100001&length=100000"
+curl_download(ENAurl.test.full, "ENA_Human_2005_XML_2_curl.xml")
+
+# offset by 200001
+library(curl)
+ENAurl.test.full = "http://www.ebi.ac.uk/ena/data/warehouse/search?query=%22tax_eq(9606)%20AND%20first_public%3E=2005-01-01%20AND%20first_public%3C=2005-12-31%22&result=sequence_release&display=xml&offset=200501&length=100000"
+curl_download(ENAurl.test.full, "ENA_Human_2005_XML_3_curl.xml")
+
+# offset by 300001
+library(curl)
+ENAurl.test.full = "http://www.ebi.ac.uk/ena/data/warehouse/search?query=%22tax_eq(9606)%20AND%20first_public%3E=2005-01-01%20AND%20first_public%3C=2005-12-31%22&result=sequence_release&display=xml&offset=300001&length=100000"
+curl_download(ENAurl.test.full, "ENA_Human_2005_XML_4_curl.xml")
+
+# offset by 400001
+library(curl)
+ENAurl.test.full = "http://www.ebi.ac.uk/ena/data/warehouse/search?query=%22tax_eq(9606)%20AND%20first_public%3E=2005-01-01%20AND%20first_public%3C=2005-12-31%22&result=sequence_release&display=xml&offset=400001&length=100000"
+curl_download(ENAurl.test.full, "ENA_Human_2005_XML_5_curl.xml")
+
+# offset by 500001
+library(curl)
+ENAurl.test.full = "http://www.ebi.ac.uk/ena/data/warehouse/search?query=%22tax_eq(9606)%20AND%20first_public%3E=2005-01-01%20AND%20first_public%3C=2005-12-31%22&result=sequence_release&display=xml&offset=500001&length=100000"
+curl_download(ENAurl.test.full, "ENA_Human_2005_XML_6_curl.xml")
+
+# offset by 600001
+library(curl)
+ENAurl.test.full = "http://www.ebi.ac.uk/ena/data/warehouse/search?query=%22tax_eq(9606)%20AND%20first_public%3E=2005-01-01%20AND%20first_public%3C=2005-12-31%22&result=sequence_release&display=xml&offset=600001&length=100000"
+curl_download(ENAurl.test.full, "ENA_Human_2005_XML_7_curl.xml")
+
+# offset by 700001
+library(curl)
+ENAurl.test.full = "http://www.ebi.ac.uk/ena/data/warehouse/search?query=%22tax_eq(9606)%20AND%20first_public%3E=2005-01-01%20AND%20first_public%3C=2005-12-31%22&result=sequence_release&display=xml&offset=700001&length=100000"
+curl_download(ENAurl.test.full, "ENA_Human_2005_XML_8_curl.xml")
+
+# offset by 800001
+library(curl)
+ENAurl.test.full = "http://www.ebi.ac.uk/ena/data/warehouse/search?query=%22tax_eq(9606)%20AND%20first_public%3E=2005-01-01%20AND%20first_public%3C=2005-12-31%22&result=sequence_release&display=xml&offset=800001&length=100000"
+curl_download(ENAurl.test.full, "ENA_Human_2005_XML_9_curl.xml")
+
+# offset by 900001
+library(curl)
+ENAurl.test.full = "http://www.ebi.ac.uk/ena/data/warehouse/search?query=%22tax_eq(9606)%20AND%20first_public%3E=2005-01-01%20AND%20first_public%3C=2005-12-31%22&result=sequence_release&display=xml&offset=900001&length=100000"
+curl_download(ENAurl.test.full, "ENA_Human_2005_XML_10_curl.xml")
+
+
+## Parsing the XML file
+
+library(XML)
+ENAResult.test.full.Parsed <- xmlTreeParse("./ENA_Human_2005_XML_curl.xml", useInternalNodes = TRUE)
+
+
+#Parse XML file 1 (if there is offset)
+library(XML)
+ENAResult.test.full.Parsed <- xmlTreeParse("./ENA_Human_2005_XML_1_curl.xml", useInternalNodes = TRUE)
+
+#Parse XML file 2 (offset 100001)
+library(XML)
+ENAResult.test.full.Parsed <- xmlTreeParse("./ENA_Human_2005_XML_2_curl.xml", useInternalNodes = TRUE)
+
+#Parse XML file 3 (offset 200001)
+library(XML)
+ENAResult.test.full.Parsed <- xmlTreeParse("./ENA_Human_2005_XML_3_curl.xml", useInternalNodes = TRUE)
+
+#Parse XML file 4 (offset 300001)
+library(XML)
+ENAResult.test.full.Parsed <- xmlTreeParse("./ENA_Human_2005_XML_4_curl.xml", useInternalNodes = TRUE)
+
+#Parse XML file 5 (offset 400001)
+library(XML)
+ENAResult.test.full.Parsed <- xmlTreeParse("./ENA_Human_2005_XML_5_curl.xml", useInternalNodes = TRUE)
+
+#Parse XML file 6 (offset 500001)
+library(XML)
+ENAResult.test.full.Parsed <- xmlTreeParse("./ENA_Human_2005_XML_6_curl.xml", useInternalNodes = TRUE)
+
+#Parse XML file 7 (offset 600001)
+library(XML)
+ENAResult.test.full.Parsed <- xmlTreeParse("./ENA_Human_2005_XML_7_curl.xml", useInternalNodes = TRUE)
+
+#Parse XML file 8 (offset 700001)
+library(XML)
+ENAResult.test.full.Parsed <- xmlTreeParse("./ENA_Human_2005_XML_8_curl.xml", useInternalNodes = TRUE)
+
+#Parse XML file 9 (offset 800001)
+library(XML)
+ENAResult.test.full.Parsed <- xmlTreeParse("./ENA_Human_2005_XML_9_curl.xml", useInternalNodes = TRUE)
+
+#Parse XML file 10 (offset 900001)
+library(XML)
+ENAResult.test.full.Parsed <- xmlTreeParse("./ENA_Human_2005_XML_10_curl.xml", useInternalNodes = TRUE)
+
+#Parse XML file 11 (offset 1000001)
+library(XML)
+ENAResult.test.full.Parsed <- xmlTreeParse("./ENA_Human_2005_XML_11_curl.xml", useInternalNodes = TRUE)
+
+#Parse XML file 12 (offset 1100001)
+library(XML)
+ENAResult.test.full.Parsed <- xmlTreeParse("./ENA_Human_2005_XML_12_curl.xml", useInternalNodes = TRUE)
+
+#Parse XML file 13 (offset 1200501)
+library(XML)
+ENAResult.test.full.Parsed <- xmlTreeParse("./ENA_Human_2005_XML_13_curl.xml", useInternalNodes = TRUE)
+
+#Parse XML file 14 (offset 1300001)
+library(XML)
+ENAResult.test.full.Parsed <- xmlTreeParse("./ENA_Human_2005_XML_14_curl.xml", useInternalNodes = TRUE)
+
+#Parse XML file 15 (offset 1400001)
+library(XML)
+ENAResult.test.full.Parsed <- xmlTreeParse("./ENA_Human_2005_XML_15_curl.xml", useInternalNodes = TRUE)
+
+#Parse XML file 16 (offset 1500001)
+library(XML)
+ENAResult.test.full.Parsed <- xmlTreeParse("./ENA_Human_2005_XML_16_curl.xml", useInternalNodes = TRUE)
+
+#Parse XML file 17 (offset 1600001)
+library(XML)
+ENAResult.test.full.Parsed <- xmlTreeParse("./ENA_Human_2005_XML_17_curl.xml", useInternalNodes = TRUE)
+
+#Parse XML file 18 (offset 1700001)
+library(XML)
+ENAResult.test.full.Parsed <- xmlTreeParse("./ENA_Human_2005_XML_18_curl.xml", useInternalNodes = TRUE)
+
+
+### 2. Retriving accesion number, first public date, and sequence length ###
+library(data.table)
+library(readr)
+
+## Choose element "entry" and attribute "accession", and then store in data.table**
+ENAResult.test.full.AccNum <- xpathSApply(ENAResult.test.full.Parsed, "//entry/@accession")
+ENAResult.test.full.AccNum.dt <- data.table(ENAResult.test.full.AccNum)
+
+write_csv(ENAResult.test.full.AccNum.dt, "ENA_Human_2005_AccessionNumber.csv")
+View(ENAResult.test.full.AccNum.dt)
+
+## Choose element "entry" and attribute "first public", and then store in data.table**
+ENAResult.test.full.firstPublic <- xpathSApply(ENAResult.test.full.Parsed, "//entry/@firstPublic")
+
+## choose element "entry" and attribute "sequence length"**
+ENAResult.test.full.SeqLen <- xpathSApply(ENAResult.test.full.Parsed, "//entry/@sequenceLength")
+
+# Construct data.table of accession number, first public, and sequence length
+ENAResult.test.full.dt.rd <- data.table(ENAResult.test.full.AccNum, ENAResult.test.full.firstPublic, ENAResult.test.full.SeqLen)
+ENAResult.test.full.dt.rd[, ENAResult.test.full.SeqLen:=as.integer(ENAResult.test.full.SeqLen)]
+View(ENAResult.test.full.dt.rd)
+
+ENAResult.test.full.dt.rd.SeqLensummary <- ENAResult.test.full.dt.rd[,sum(ENAResult.test.full.SeqLen)]
+View(ENAResult.test.full.dt.rd.SeqLensummary)
+
+# Remove duplicated accession numbers - if needed
+#ENAResult.test.full.dt.rd <- unique(ENAResult.test.full.dt.rd, by = "ENAResult.test.full.AccNum")
+
+
+### 3. Retriving Article Authors information ###
+
+## Select element "entry", "reference", attribute type is article and number is 1 (first article), choose author (names)
+
+ENAResult.test.full.Authors.Combine.dt <- do.call(rbind, xpathApply(ENAResult.test.full.Parsed, "/ROOT/entry", function(node) {
+  
+  ENAResult.test.full.AccNum <- xmlGetAttr(node, "accession", NA)
+  
+  author.xp <- "./reference[@type='article' and @number='1']/author"
+  ENAResult.test.full.Authors <- xpathSApply(node, author.xp, xmlValue)
+  if (is.null(ENAResult.test.full.Authors)) ENAResult.test.full.Authors <- NA
+  
+  ENAResult.test.full.Authors.dtraw <- data.table(ENAResult.test.full.AccNum, ENAResult.test.full.Authors)
+  
+  ### generate unique row ids for each author
+  ENAResult.test.full.AuthorsIndex <- rowid(ENAResult.test.full.Authors.dtraw$ENAResult.test.full.AccNum, prefix="author ")
+  ENAResult.test.full.Authors.Combine.dt <- data.table(ENAResult.test.full.Authors.dtraw, ENAResult.test.full.AuthorsIndex)
+  
+}))
+
+
+### spreading author number variables into columns and tidy format
+library(tidyr)
+ENAResult.test.full.Authors.wide <- spread(ENAResult.test.full.Authors.Combine.dt, ENAResult.test.full.AuthorsIndex, ENAResult.test.full.Authors)
+
+### Setting the column order 
+
+# caculate the column length and then generate a sequence of that length 
+library(dplyr)
+ENA.test.full.AuthorsOnly <- select(ENAResult.test.full.Authors.wide, -ENAResult.test.full.AccNum)
+ENA.test.full.AuthorsOnly.ncol <- ncol(ENA.test.full.AuthorsOnly)
+ENA.test.full.AuthorsOnly.ncol.seq <- seq_len(ENA.test.full.AuthorsOnly.ncol)
+
+# Write a fucntion that paste ENA author with x
+PasteENAAuthor<- function (x){
+  paste("author", x, sep = " ")
+}
+# Paste EPMC author to each number in the sequence 
+ENA.test.full.AuthorsOnly.order <- sapply(ENA.test.full.AuthorsOnly.ncol.seq, PasteENAAuthor)
+
+# Reorder the tbl with AuthorsOnly index
+library(data.table)
+setcolorder(ENAResult.test.full.Authors.wide, c("ENAResult.test.full.AccNum", ENA.test.full.AuthorsOnly.order))
+
+
+### Joining Accession record and authors tbls by left_join, "ENAResult.test.full.AccNum"(Accession Number)
+library(dplyr)
+ENAResult.test.full.fullwidelft.raw <- left_join(ENAResult.test.full.dt.rd, ENAResult.test.full.Authors.wide, by = "ENAResult.test.full.AccNum")
+library(data.table)
+library(readr)
+ENAResult.test.full.fullwidelft <- data.table(ENAResult.test.full.fullwidelft.raw)
+write_csv(ENAResult.test.full.fullwidelft, "ENA_Human_2005_ArticleAuthors_all.csv")
+
+
+### Filter accession numbers that author 1 is not NA
+ENAResult.test.full.fullwidelft.na.omit <- na.omit(ENAResult.test.full.fullwidelft, cols="author 1")
+library(readr)
+write_csv(ENAResult.test.full.fullwidelft.na.omit, "ENA_Human_2005_ArticleAuthors_NAOmitted.csv")
+View(ENAResult.test.full.fullwidelft.na.omit)
+
+
+ENAResult.test.full.fullwidelft.na.omit.SeqLensummary <- ENAResult.test.full.fullwidelft.na.omit[,sum(ENAResult.test.full.SeqLen)]
+View(ENAResult.test.full.fullwidelft.na.omit.SeqLensummary)
+
+
+### 4. Retrieving submitter/ submission authors information ### 
+
+## Select element "entry", "reference", attribute type is submission, choose element author***
+library(XML)
+library(data.table)
+ENAResult.test.full.SubmissionAuthors.Combine.dt <- do.call(rbind, xpathApply(ENAResult.test.full.Parsed, "/ROOT/entry", function(node) {
+  
+  ENAResult.test.full.AccNum <- xmlGetAttr(node, "accession", NA)
+  
+  Submissionauthor.xp <- "./reference[@type='submission']/author"
+  
+  ENAResult.test.full.SubmissionAuthors <- xpathSApply(node, Submissionauthor.xp, xmlValue)
+  if (is.null(ENAResult.test.full.SubmissionAuthors)) ENAResult.test.full.SubmissionAuthors <- NA
+  
+  ENAResult.test.full.SubmissionAuthors.dtraw <- data.table(ENAResult.test.full.AccNum, ENAResult.test.full.SubmissionAuthors)
+  
+  ### generate unique row ids for each Submission author
+  ENAResult.test.full.SubmissionAuthorsIndex <- rowid(ENAResult.test.full.SubmissionAuthors.dtraw$ENAResult.test.full.AccNum, prefix="Submitter_")
+  ENAResult.test.full.SubmissionAuthors.Combine.dt <- data.table(ENAResult.test.full.SubmissionAuthors.dtraw, ENAResult.test.full.SubmissionAuthorsIndex)
+}))
+
+
+
+## #spreading author number variables into columns
+library(tidyr)
+ENAResult.test.full.SubmissionAuthors.wide <- spread(ENAResult.test.full.SubmissionAuthors.Combine.dt, ENAResult.test.full.SubmissionAuthorsIndex, ENAResult.test.full.SubmissionAuthors, fill = NA)
+
+### Setting Null to NA in the data.table
+ENAResult.test.full.SubmissionAuthors.wide[ENAResult.test.full.SubmissionAuthors.wide == "NULL"]<-NA
+
+
+### Setting the column order 
+
+# caculate the column length and then generate a sequence of that length 
+library(dtplyr)
+ENAResult.test.full.SubmissionAuthors.wide <- tbl_dt(ENAResult.test.full.SubmissionAuthors.wide)
+library(dplyr)
+ENA.test.full.SubmissionAuthorsOnly <- select(ENAResult.test.full.SubmissionAuthors.wide, -ENAResult.test.full.AccNum)
+ENA.test.full.SubmissionAuthorsOnly.ncol <- ncol(ENA.test.full.SubmissionAuthorsOnly)
+ENA.test.full.SubmissionAuthorsOnly.ncol.seq <- seq_len(ENA.test.full.SubmissionAuthorsOnly.ncol)
+
+# Write a fucntion that paste submission author with x
+PasteENASubmissionAuthor <- function (x){
+  paste("Submitter", x, sep = "_")
+}
+# Paste Submission author to each number in the sequence 
+ENA.test.full.SubmissionAuthorsOnly.order <- sapply(ENA.test.full.SubmissionAuthorsOnly.ncol.seq, PasteENASubmissionAuthor)
+
+setnames(ENAResult.test.full.SubmissionAuthors.wide, colnames(ENAResult.test.full.SubmissionAuthors.wide), c("ENAResult.test.full.AccNum", ENA.test.full.SubmissionAuthorsOnly.order))
+
+# Reorder the tbl with SubmissionAuthorsOnly index
+library(data.table)
+setcolorder(ENAResult.test.full.SubmissionAuthors.wide, c("ENAResult.test.full.AccNum", ENA.test.full.SubmissionAuthorsOnly.order))
+
+### Joining Accession record and submission authors tbls by left_join, "ENAResult.test.full.AccNum"(Accession Number)
+library(dplyr)
+ENAResult.test.full.SubmissionAuthor.fullwidelft.raw <- left_join(ENAResult.test.full.dt.rd, ENAResult.test.full.SubmissionAuthors.wide, by = "ENAResult.test.full.AccNum")
+library(data.table)
+ENAResult.test.full.SubmissionAuthor.fullwidelft <- data.table(ENAResult.test.full.SubmissionAuthor.fullwidelft.raw)
+#setnames(ENAResult.test.full.SubmissionAuthor.fullwidelft, colnames(ENAResult.test.full.SubmissionAuthor.fullwidelft), c("ENAResult.test.full.AccNum", "ENAResult.test.full.SeqLen", ENA.test.full.SubmissionAuthorsOnly.order))
+
+ENAResult.test.full.SubmissionAuthor.fullwidelft.year<- ENAResult.test.full.SubmissionAuthor.fullwidelft[, YearOfENARecord := 2005]
+
+
+library(readr)
+write_csv(ENAResult.test.full.SubmissionAuthor.fullwidelft.year, "ENA_Human_2005_Submitter_all.csv")
+
+
+### Filter accession numbers that Submitter 1 is not NA
+ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit <- na.omit(ENAResult.test.full.SubmissionAuthor.fullwidelft, cols="Submitter_1")
+
+write_csv(ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit, "ENA_Human_2005_Submitter_NAomitted.csv")
+View(ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit)
+
+ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit.SeqLensummary <- ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit[,sum(ENAResult.test.full.SeqLen)]
+View(ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit.SeqLensummary)
+
+
+
+### 5. Join the full reesults of accession records, article authors and submission information by accession number ###
+ENAResult.test.full.fullwide2lft.submitter.formerging <- ENAResult.test.full.SubmissionAuthor.fullwidelft[,"ENAResult.test.full.firstPublic":=NULL][,"ENAResult.test.full.SeqLen":=NULL]
+
+library(dplyr)
+ENAResult.test.full.fullwide2lft.authorandsubmitter <- left_join(ENAResult.test.full.fullwidelft, ENAResult.test.full.fullwide2lft.submitter.formerging, by = "ENAResult.test.full.AccNum")
+
+library(readr)
+write_csv(ENAResult.test.full.fullwide2lft.authorandsubmitter, "ENA_Human_2005_FULL_AuthorandSubmitter.csv")
+View(ENAResult.test.full.fullwide2lft.authorandsubmitter)
+
+#Identify duplicates
+ENAResult.test.full.fullwide2lft.authorandsubmitter.unique <- unique(ENAResult.test.full.fullwide2lft.authorandsubmitter, by = c("ENAResult.test.full.AccNum", "YearOfENARecord"))
+identical(ENAResult.test.full.fullwide2lft.authorandsubmitter, ENAResult.test.full.fullwide2lft.authorandsubmitter.unique) #True or False if there are duplicates
+
+
+### Identifying orphan accession numbers
+library(data.table)
+ENAResult.test.full.fullwide2lft.dt <- data.table(ENAResult.test.full.fullwide2lft.authorandsubmitter)
+
+ENAResult.test.full.fullwide2lft.dt.Orphan<- na.omit(ENAResult.test.full.fullwide2lft.dt, cols="author 1", invert = TRUE)
+ENAResult.test.full.fullwide2lft.dt.Orphan<- na.omit(ENAResult.test.full.fullwide2lft.dt.Orphan, cols="Submitter_1", invert = TRUE)
+
+write_csv(ENAResult.test.full.fullwide2lft.dt.Orphan, "ENA_Human_2005_OraphanAccNum.csv")
+View(ENAResult.test.full.fullwide2lft.dt.Orphan)
+
+ENAResult.test.full.fullwide2lft.dt.Orphan.SeqLensummary <- ENAResult.test.full.fullwide2lft.dt.Orphan[,sum(ENAResult.test.full.SeqLen)]
+View(ENAResult.test.full.fullwide2lft.dt.Orphan.SeqLensummary)
+
+## Count the submitter institution of each accession number
+ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.rd.dt.Select<- ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.rd.dt[, c(1:2, 5)]
+
+library(readr)
+write_csv(ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.rd.dt.Select, "ENA_Human_2005_AccNum_SubmitterInstitution_SeqLen.csv")
+View(ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.rd.dt.Select)
+
+library(data.table)
+ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.rd.dt.Select.SeqLensummary <- ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.rd.dt.Select[,sum(ENAResult.test.full.SeqLen)]
+View(ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.rd.dt.Select.SeqLensummary)
+
+
+### Count the number of submission authors ###
+library(data.table)
+ENAResult.test.full.SubmissionAuthors.Combine.dt.long.na.omit <- na.omit(ENAResult.test.full.SubmissionAuthors.Combine.dt, cols="ENAResult.test.full.SubmissionAuthors")
+ENAResult.test.full.SubmissionAuthors.Combine.dt.long.na.omit.Author1 <- ENAResult.test.full.SubmissionAuthors.Combine.dt.long.na.omit[ENAResult.test.full.SubmissionAuthorsIndex == "Submitter_1"]
+library(dtplyr)
+ENAResult.test.full.SubmissionAuthors.Combine.dt.long.na.omit.Author1 <- tbl_dt(ENAResult.test.full.SubmissionAuthors.Combine.dt.long.na.omit.Author1)
+
+ENAResult.test.full.SubmissionAuthors.Combine.dt.long.count <-ENAResult.test.full.SubmissionAuthors.Combine.dt.long.na.omit.Author1[,.N, by=ENAResult.test.full.SubmissionAuthors]
+
+#library(dplyr)
+#ENAResult.test.full.SubmissionAuthors.Combine.dt.long.count <- count(ENAResult.test.full.SubmissionAuthors.Combine.dt.long.na.omit.Author1, ENAResult.test.full.SubmissionAuthors, sort = TRUE)
+setnames(ENAResult.test.full.SubmissionAuthors.Combine.dt.long.count, c("N", "ENAResult.test.full.SubmissionAuthors"), c("ENA_times_submitted", "Submitter_1"))
+
+### Attach year to the records
+ENAResult.test.full.SubmissionAuthors.Combine.dt.long.count.year <- ENAResult.test.full.SubmissionAuthors.Combine.dt.long.count[, YearOfENARecord := 2005]
+ENAResult.test.full.SubmissionAuthors.Combine.dt.long.count.year <- ENAResult.test.full.SubmissionAuthors.Combine.dt.long.count.year[order(-ENA_times_submitted)]
+
+library(readr)
+write_tsv(ENAResult.test.full.SubmissionAuthors.Combine.dt.long.count.year, "ENA_Human_2005_SubmissionAuthors_timesSubmitted.tsv")
+
+### Counting the sequence length submitted of each submission author 1
+library(dplyr)
+ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit.AccNum.SeqLen.SubmissionAuthor1 <- select(ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit, 1:4)
+library(data.table)
+#setnames(ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit.AccNum.SeqLen.SubmissionAuthor1, "Submission author 1", "Submission_author_1")
+library(dtplyr)
+ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit.AccNum.SeqLen.SubmissionAuthor1 <- tbl_dt(ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit.AccNum.SeqLen.SubmissionAuthor1)
+
+ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit.SeqLen.SubmissionAuthor.count <- ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit.AccNum.SeqLen.SubmissionAuthor1[,.(ENA_SeqLen_submitted = sum(ENAResult.test.full.SeqLen)),by="Submitter_1"]
+#ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit.SeqLen.SubmissionAuthor.count <- count(ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit.AccNum.SeqLen.SubmissionAuthor1, Submission_author_1, wt = ENAResult.test.full.SeqLen, sort = TRUE)
+#setnames(ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit.SeqLen.SubmissionAuthor.count, "n", "ENA_SeqLen_submitted")
+
+# Order the result by Sequence Length Submitted in descending order
+ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit.SeqLen.SubmissionAuthor.count <- ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit.SeqLen.SubmissionAuthor.count[, YearOfENARecord := 2005]
+ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit.SeqLen.SubmissionAuthor.count <- ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit.SeqLen.SubmissionAuthor.count[order(-ENA_SeqLen_submitted)]
+
+
+library(readr)
+write_tsv(ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit.SeqLen.SubmissionAuthor.count, "ENA_Human_2005_SubmissionAuthors_SeqLenSubmitted.tsv")
+
+
+## Join data table of submitter's Sequence length submitted and times submitted 
+ENAResult.test.full.SubmissionAuthor.TimesSubmitted.SeqLen.dt <- left_join(ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit.SeqLen.SubmissionAuthor.count, ENAResult.test.full.SubmissionAuthors.Combine.dt.long.count, by = "Submitter_1")
+ENAResult.test.full.SubmissionAuthor.TimesSubmitted.SeqLen.dt <- ENAResult.test.full.SubmissionAuthor.TimesSubmitted.SeqLen.dt[, YearOfENARecord.x:=NULL][, YearOfENARecord.y:=NULL]
+ENAResult.test.full.SubmissionAuthor.TimesSubmitted.SeqLen.dt.year <- ENAResult.test.full.SubmissionAuthor.TimesSubmitted.SeqLen.dt[, YearOfENARecord := 2005][order(-ENA_SeqLen_submitted)]
+
+
+library(readr)
+write_tsv(ENAResult.test.full.SubmissionAuthor.TimesSubmitted.SeqLen.dt.year, "ENA_Human_2005_SubmissionAuthors_SeqLen_and_TimesSubmitted.tsv")
+View(ENAResult.test.full.SubmissionAuthor.TimesSubmitted.SeqLen.dt.year)
+
+ENAResult.test.full.SubmissionRefLocation.dt.wide.na.omit
+
+ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.SeqLen.dt
+
+
+## Select element "entry", "reference", attribute type is submission, choose element date***
+
+ENAResult.test.full.SubmissionDate.dt.combine <- do.call(rbind, xpathApply(ENAResult.test.full.Parsed, "/ROOT/entry", function(node) {
+  
+  ENAResult.test.full.AccNum <- xmlGetAttr(node, "accession", NA)
+  
+  SubmissionDate.xp <- "./reference[@type='submission']/submissionDate"
+  ENAResult.test.full.SubmissionDate <- xpathSApply(node, SubmissionDate.xp, xmlValue)
+  if (is.null(ENAResult.test.full.SubmissionDate)) ENAResult.test.full.SubmissionDate <- NA
+  
+  
+  ENAResult.test.full.SubmissionDate.dtraw <- data.table(ENAResult.test.full.AccNum, ENAResult.test.full.SubmissionDate)
+  
+  ### generate unique row ids for each Submission date
+  ENAResult.test.full.SubmissionDateIndex <- rowid(ENAResult.test.full.SubmissionDate.dtraw$ENAResult.test.full.AccNum, prefix="Submission Date ")
+  ENAResult.test.full.SubmissionDate.dt.combine <- data.table(ENAResult.test.full.SubmissionDate.dtraw, ENAResult.test.full.SubmissionDateIndex)
+  
+}))
+
+### spreading submission date variables into columns
+library(tidyr)
+ENAResult.test.full.SubmissionDate.dt.wide <- spread(ENAResult.test.full.SubmissionDate.dt.combine, ENAResult.test.full.SubmissionDateIndex, ENAResult.test.full.SubmissionDate)
+
+
+#write_tsv(ENAResult.test.full.SubmissionDate.dt.wide, "ENAtest_Human_2005_submissiondate.tsv")
+#unique(ENAResult.test.full.SubmissionDate.dtraw$ENAResult.test.full.AccNum)
+
+
+## Select element "entry", "reference", attribute type is submission, choose element reference Location***
+
+ENAResult.test.full.SubmissionRefLocation.dt.combine <- do.call(rbind, xpathApply(ENAResult.test.full.Parsed, "/ROOT/entry", function(node) {
+  
+  ENAResult.test.full.AccNum <- xmlGetAttr(node, "accession", NA)
+  
+  SubmissionRefLocation.xp <- "./reference[@type='submission']/referenceLocation"
+  ENAResult.test.full.SubmissionRefLocation <- xpathSApply(node, SubmissionRefLocation.xp, xmlValue)
+  if (is.null(ENAResult.test.full.SubmissionRefLocation)) ENAResult.test.full.SubmissionRefLocation <- NA
+  
+  ENAResult.test.full.SubmissionRefLocation.dtraw <- data.table(ENAResult.test.full.AccNum, ENAResult.test.full.SubmissionRefLocation)
+  
+  ### generate unique row ids for each Submission date
+  ENAResult.test.full.SubmissionRefLocationIndex <- rowid(ENAResult.test.full.SubmissionRefLocation.dtraw$ENAResult.test.full.AccNum, prefix="Submission_Location_")
+  ENAResult.test.full.SubmissionRefLocation.dt.combine <- data.table(ENAResult.test.full.SubmissionRefLocation.dtraw, ENAResult.test.full.SubmissionRefLocationIndex)
+}))
+
+# Remove Duplicated accession numbers
+#ENAResult.test.full.SubmissionRefLocation.dt.combine <- unique(ENAResult.test.full.SubmissionRefLocation.dt.combine, by = "ENAResult.test.full.AccNum")
+
+### spreading submission date variables into columns
+library(tidyr)
+ENAResult.test.full.SubmissionRefLocation.dt.wide <- spread(ENAResult.test.full.SubmissionRefLocation.dt.combine, ENAResult.test.full.SubmissionRefLocationIndex, ENAResult.test.full.SubmissionRefLocation)
+
+### Subset tbl of submission Ref Location (submission location 1 only, the initial submitter) that are not NA
+ENAResult.test.full.SubmissionRefLocation.dt.wide.na.omit <- na.omit(ENAResult.test.full.SubmissionRefLocation.dt.wide, cols = "Submission_Location_1")
+
+### splitting the Ref location by splitting "INSDC", and replacing "contact:" with space
+library(stringr)
+ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.raw <- str_split(ENAResult.test.full.SubmissionRefLocation.dt.wide.na.omit$Submission_Location_1, "INSDC\\.", simplify = TRUE)
+ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.list <- ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.raw[,2]
+ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.list.raw <- str_replace_all(ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.list, "Contact\\:", replacement = "" )
+ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.list.raw.trim <- str_trim(ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.list.raw, side = "both")
+ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.dt <- data.table(ENAResult.test.full.AccNum = ENAResult.test.full.SubmissionRefLocation.dt.wide.na.omit$ENAResult.test.full.AccNum, ENA_submitter = ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.list.raw.trim)
+
+### Counting how many times each submitter submitted sequence to ENA
+#library(dplyr)
+#ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.dt.count <- count(ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.dt, ENA_submitter, sort = TRUE)
+#ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.dt.count.dt <- rename(ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.dt.count, ENA_times_submitted = n)
+
+ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.dt.count <- ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.dt[, .N, by="ENA_submitter"]
+setnames(ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.dt.count, "N", "ENA_times_submitted")
+
+
+## Join data table of submitter's times submitted with accession numbers
+ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.AccNum.dt <- left_join(ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.dt.count, ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.dt, by = "ENA_submitter")
+
+## Join data table of submitter's name, times submitted, accession numbers, first public data and sequence length
+ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.rd.dt<- left_join(ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.AccNum.dt, ENAResult.test.full.dt.rd, by = "ENAResult.test.full.AccNum")
+
+
+ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.SeqLen.dt <- select(ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.rd.dt, ENA_submitter, ENAResult.test.full.SeqLen)
+### Sum the sequence Length of each submitter
+ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.SeqLenSum.dt <- ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.SeqLen.dt[,.(ENA_SeqLen_submitted = sum(ENAResult.test.full.SeqLen)),by= "ENA_submitter"]
+
+# Order the result by Sequence Length Submitted in descending order
+ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit.SeqLen.SubmissionAuthor.count <- ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.SeqLenSum.dt[, YearOfENARecord := 2005][order(-ENA_SeqLen_submitted)]
+
+
+### Counting how many sequences and how many times submitted by each submitter (FINAL) ###
+ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.TimesSubmitted.SeqLenSum.dt<- left_join(ENAResult.test.full.SubmissionAuthor.fullwidelft.na.omit.SeqLen.SubmissionAuthor.count, ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.dt.count, by = "ENA_submitter")
+ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.TimesSubmitted.SeqLenSum.ordered <- ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.TimesSubmitted.SeqLenSum.dt[order(-ENA_SeqLen_submitted)]
+ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.TimesSubmitted.SeqLenSum.ordered <- setcolorder(ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.TimesSubmitted.SeqLenSum.ordered, c("ENA_submitter", "ENA_SeqLen_submitted", "ENA_times_submitted", "YearOfENARecord"))
+
+# Write tsv
+library(readr)
+write_tsv(ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.TimesSubmitted.SeqLenSum.ordered, "ENA_Human_2005_SubmissionCentre_TimesandSeqLenSubmitted.tsv")
+View(ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.count.TimesSubmitted.SeqLenSum.ordered)
+
+
+
+# Contruct data table for accession number, submission authors, and Location
+library(dplyr)
+ENAResult.test.full.dt.sub.fullinfo <- left_join(ENAResult.test.full.SubmissionAuthors.wide, ENAResult.test.full.SubmissionRefLocation.dt.wide.SubmissionLocation1.dt, by = "ENAResult.test.full.AccNum")
+
+library(readr)
+write_tsv(ENAResult.test.full.dt.sub.fullinfo, "ENA_Human_2005_SubmissionAuthorsAndCentres.tsv")
+View(ENAResult.test.full.dt.sub.fullinfo)
+
+
+# Contruct data table for accession number, submission date and Location
+ENAResult.test.full.dt.sub.rd <- left_join(ENAResult.test.full.SubmissionDate.dt.wide, ENAResult.test.full.SubmissionRefLocation.dt.wide, by = "ENAResult.test.full.AccNum")
+
+# Contruct data table for accession number, submission authors, date and Location
+ENAResult.test.full.dt.sub.fullinfo <- left_join(ENAResult.test.full.SubmissionAuthors.wide, ENAResult.test.full.dt.sub.rd, by = "ENAResult.test.full.AccNum")
+
+
+### 5. Join the full reesults of accession records, article authors and submission information by accession number ##
+library(dplyr)
+ENAResult.test.full.fullwide2lft <- left_join(ENAResult.test.full.fullwidelft, ENAResult.test.full.dt.sub.fullinfo, by = "ENAResult.test.full.AccNum")
+
+library(readr)
+write_tsv(ENAResult.test.full.fullwide2lft, "ENA_Human_2005_ArticleAndSubmissionAuthors.tsv")
+
+### Identifying orphan accession numbers
+library(data.table)
+ENAResult.test.full.fullwide2lft.dt <- data.table(ENAResult.test.full.fullwide2lft)
+ENAResult.test.full.fullwide2lft.dt.Author1SubmissionAuthor1 <- ENAResult.test.full.fullwide2lft.dt[,.(`author 1`, `Submitter 1`)]
+ENAResult.test.full.fullwide2lft.dt.Author1NA <- na.omit(ENAResult.test.full.fullwide2lft.dt.Author1SubmissionAuthor1, cols ="author 1", invert = TRUE)
+ENAResult.test.full.fullwide2lft.dt.Author1SubmissionAuthor1NA <- na.omit(ENAResult.test.full.fullwide2lft.dt.Author1NA, cols ="Submitter 1", invert = TRUE)
+
+### END ###
